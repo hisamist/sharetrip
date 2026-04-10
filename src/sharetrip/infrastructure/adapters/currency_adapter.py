@@ -2,7 +2,7 @@ import httpx
 
 from sharetrip.domain.interfaces.currency_port import CurrencyPort
 
-FRANKFURTER_BASE_URL = "https://api.frankfurter.app"
+_DEFAULT_BASE_URL = "https://api.frankfurter.app"
 
 
 class FrankfurterCurrencyAdapter(CurrencyPort):
@@ -13,12 +13,15 @@ class FrankfurterCurrencyAdapter(CurrencyPort):
     uniquement le float attendu par le domaine.
     """
 
+    def __init__(self, base_url: str = _DEFAULT_BASE_URL) -> None:
+        self._base_url = base_url
+
     def get_rate(self, from_currency: str, to_currency: str) -> float:
         if from_currency == to_currency:
             return 1.0
 
         response = httpx.get(
-            f"{FRANKFURTER_BASE_URL}/latest",
+            f"{self._base_url}/latest",
             params={"from": from_currency, "to": to_currency},
             timeout=5.0,
         )
