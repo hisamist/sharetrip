@@ -17,6 +17,7 @@ def session():
     with Session(engine) as s:
         yield s
     Base.metadata.drop_all(engine)
+    engine.dispose()  # ferme toutes les connexions du pool
 
 
 @pytest.fixture
