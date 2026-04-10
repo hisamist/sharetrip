@@ -4,7 +4,9 @@ version = "0.1.0"
 dependencies = [
     "fastapi",
     "uvicorn",
-    "pydantic"
+    "pydantic",
+    "sqlalchemy",
+    "alembic"
 ]
 
 [project.optional-dependencies]
