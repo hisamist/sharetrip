@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.interfaces.currency_port import CurrencyPort
+from sharetrip.domain.interfaces.expense_observer import ExpenseObserver
 from sharetrip.domain.interfaces.trip_repository import TripRepository
 from sharetrip.domain.services.split_factory import SplitFactory
 
@@ -30,10 +31,12 @@ class AddExpenseUseCase:
         trip_repository: TripRepository,
         currency_port: CurrencyPort,
         split_factory: SplitFactory,
+        observers: list[ExpenseObserver] | None = None,
     ) -> None:
         self._repo = trip_repository
         self._currency = currency_port
         self._factory = split_factory
+        self._observers: list[ExpenseObserver] = observers or []
 
     def execute(self, input: AddExpenseInput) -> AddExpenseOutput:
         # 1. Récupérer le trip → connaître la devise pivot
@@ -69,5 +72,9 @@ class AddExpenseUseCase:
 
         # 5. Persister les splits
         saved_splits = self._repo.save_splits(splits)
+
+        # 6. Notifier les observers
+        for observer in self._observers:
+            observer.on_expense_created(saved_expense, trip)
 
         return AddExpenseOutput(expense=saved_expense, splits=saved_splits)

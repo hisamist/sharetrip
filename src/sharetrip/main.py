@@ -21,6 +21,7 @@ from sharetrip.infrastructure.cache.cached_currency_adapter import CachedCurrenc
 from sharetrip.infrastructure.cache.cached_trip_repository import CachedTripRepository
 from sharetrip.infrastructure.db.sql_trip_repository import SQLTripRepository
 from sharetrip.infrastructure.db.sql_user_repository import SQLUserRepository
+from sharetrip.infrastructure.notifications.log_observer import LogNotificationObserver
 from sharetrip.use_cases.add_expense import AddExpenseInput, AddExpenseUseCase
 from sharetrip.use_cases.compute_settlements import (
     ComputeSettlementsInput,
@@ -335,6 +336,7 @@ def add_expense(
         trip_repository=trip_repo,
         currency_port=currency_port,
         split_factory=SplitFactory(),
+        observers=[LogNotificationObserver()],
     )
     try:
         output = use_case.execute(
