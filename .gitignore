@@ -18,5 +18,5 @@ htmlcov/
 # OS
 .DS_Store
 
-sharetrip.egg-info
+sharetrip.egg-info/
 .egg-info

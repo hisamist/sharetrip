@@ -8,10 +8,11 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
 @app.get("/health", tags=["Monitoring"])
 async def health_check():
     """
-    Vérifie que l'API est en ligne. 
+    Vérifie que l'API est en ligne.
     Plus tard, on ajoutera ici les tests de connexion à Redis et Vault.
     """
     return JSONResponse(
@@ -21,12 +22,14 @@ async def health_check():
             "services": {
                 "api": "up",
                 "vault": "pending",  # À implémenter
-                "redis": "pending"   # À implémenter
-            }
+                "redis": "pending",  # À implémenter
+            },
         },
-        status_code=200
+        status_code=200,
     )
+
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
