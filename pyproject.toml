@@ -10,7 +10,10 @@ dependencies = [
     "alembic",
     "redis",
     "httpx",
-    "psycopg2-binary"
+    "psycopg2-binary",
+    "bcrypt",
+    "pyjwt",
+    "pydantic[email]>=2.0",
 ]
 
 [project.optional-dependencies]
@@ -38,6 +41,10 @@ lint-fix = "python -m ruff check . --fix"
 
 # Automatically fix linting errors and reformat code
 format = "python -m ruff format ."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

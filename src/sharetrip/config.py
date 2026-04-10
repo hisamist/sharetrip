@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     # Cache Repository
     repo_cache_ttl: int = 300  # 5min en secondes
 
+    # Auth
+    jwt_secret_key: str = "change-me-in-production"
+    jwt_expire_minutes: int = 60 * 24  # 24h
+
     # App
     app_env: str = "development"  # development | production
 
