@@ -11,7 +11,7 @@ class SplitType(StrEnum):
 
 
 class ExpenseSplit(BaseModel):
-    expense_id: int
+    expense_id: int | None
     user_id: int
     share_ratio: float = Field(gt=0)
     id: int | None = None
