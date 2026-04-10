@@ -10,9 +10,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from sharetrip.api.dependencies import (
+    get_currency_port,
+    get_db_session,
+    get_redis_client,
+)
 from sharetrip.domain.interfaces.currency_port import CurrencyPort
 from sharetrip.infrastructure.db.models import Base
-from sharetrip.main import app, get_currency_port, get_db_session, get_redis_client
+from sharetrip.main import app
 
 
 # ─── Fakes ────────────────────────────────────────────────────────────────────

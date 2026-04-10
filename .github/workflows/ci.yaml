@@ -31,6 +31,5 @@ jobs:
         run: task lint
 
       - name: Run tests with coverage
-        # Cette commande échouera automatiquement si la couverture < 80%(idéalement)
-        # Mais pour l'instance without limit couverage
-        run: task test
+        # Cette commande échouera automatiquement si la couverture < 80%
+        run: task cov
