@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     repo_cache_ttl: int = 300  # 5min en secondes
 
     # Auth
-    jwt_secret_key: str = "change-me-in-production"
+    jwt_secret_key: str = "test-secret-key-minimum-32-characters-long"
     jwt_expire_minutes: int = 60 * 24  # 24h
 
     # App

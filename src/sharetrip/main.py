@@ -7,7 +7,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from sharetrip.config import Settings, get_settings
+from sharetrip.domain.entities.expense import ExpenseSplit, SplitType
+from sharetrip.domain.entities.membership import Membership
+from sharetrip.domain.entities.trip import Trip
 from sharetrip.domain.entities.user import User
+from sharetrip.domain.services.split_factory import SplitFactory
 from sharetrip.infrastructure.adapters.currency_adapter import (
     FrankfurterCurrencyAdapter,
 )
@@ -17,6 +21,7 @@ from sharetrip.infrastructure.cache.cached_currency_adapter import CachedCurrenc
 from sharetrip.infrastructure.cache.cached_trip_repository import CachedTripRepository
 from sharetrip.infrastructure.db.sql_trip_repository import SQLTripRepository
 from sharetrip.infrastructure.db.sql_user_repository import SQLUserRepository
+from sharetrip.use_cases.add_expense import AddExpenseInput, AddExpenseUseCase
 from sharetrip.use_cases.login_user import LoginInput, LoginUseCase
 from sharetrip.use_cases.register_user import RegisterInput, RegisterUseCase
 
@@ -122,6 +127,56 @@ class UserResponse(BaseModel):
     email: str
 
 
+# ─── Schemas Trips ────────────────────────────────────────────────────────────
+
+
+class TripRequest(BaseModel):
+    name: str
+    base_currency: str
+
+
+class TripResponse(BaseModel):
+    id: int
+    name: str
+    base_currency: str
+
+
+# ─── Schemas Expenses ─────────────────────────────────────────────────────────
+
+
+class SplitRequest(BaseModel):
+    user_id: int
+    share_ratio: float
+
+
+class AddExpenseRequest(BaseModel):
+    title: str
+    amount: float
+    currency: str
+    split_type: SplitType
+    category: str | None = None
+    splits: list[SplitRequest] = []
+
+
+class SplitResponse(BaseModel):
+    user_id: int
+    amount_owed: float
+    share_ratio: float
+
+
+class ExpenseResponse(BaseModel):
+    id: int
+    trip_id: int
+    paid_by: int
+    title: str
+    amount_pivot: float
+    original_currency: str | None
+    exchange_rate: float
+    split_type: SplitType
+    category: str | None
+    splits: list[SplitResponse] = []
+
+
 # ─── Routes Auth ──────────────────────────────────────────────────────────────
 
 
@@ -185,6 +240,140 @@ def me(current_user: User = Depends(get_current_user)):
         display_name=current_user.display_name,
         email=current_user.email,
     )
+
+
+# ─── Routes Trips ─────────────────────────────────────────────────────────────
+
+
+@app.post("/trips", response_model=TripResponse, status_code=201, tags=["Trips"])
+def create_trip(
+    body: TripRequest,
+    trip_repo=Depends(get_trip_repository),
+    current_user: User = Depends(get_current_user),
+):
+    trip = trip_repo.save_trip(Trip(name=body.name, base_currency=body.base_currency))
+    trip_repo.add_member(Membership(trip_id=trip.id, user_id=current_user.id))
+    return TripResponse(id=trip.id, name=trip.name, base_currency=trip.base_currency)
+
+
+@app.get("/trips/{trip_id}", response_model=TripResponse, tags=["Trips"])
+def get_trip(
+    trip_id: int,
+    trip_repo=Depends(get_trip_repository),
+    _: User = Depends(get_current_user),
+):
+    trip = trip_repo.get_trip(trip_id)
+    if trip is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
+        )
+    return TripResponse(id=trip.id, name=trip.name, base_currency=trip.base_currency)
+
+
+@app.post("/trips/{trip_id}/members", status_code=204, tags=["Trips"])
+def add_member(
+    trip_id: int,
+    user_id: int,
+    trip_repo=Depends(get_trip_repository),
+    _: User = Depends(get_current_user),
+):
+    trip = trip_repo.get_trip(trip_id)
+    if trip is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
+        )
+    trip_repo.add_member(Membership(trip_id=trip_id, user_id=user_id))
+
+
+# ─── Routes Expenses ──────────────────────────────────────────────────────────
+
+
+def _to_expense_response(expense, splits) -> ExpenseResponse:
+    return ExpenseResponse(
+        id=expense.id,
+        trip_id=expense.trip_id,
+        paid_by=expense.paid_by,
+        title=expense.title,
+        amount_pivot=expense.amount_pivot,
+        original_currency=expense.original_currency,
+        exchange_rate=expense.exchange_rate,
+        split_type=expense.split_type,
+        category=expense.category,
+        splits=[
+            SplitResponse(
+                user_id=s.user_id,
+                amount_owed=s.amount_owed,
+                share_ratio=s.share_ratio,
+            )
+            for s in splits
+        ],
+    )
+
+
+@app.post(
+    "/trips/{trip_id}/expenses",
+    response_model=ExpenseResponse,
+    status_code=201,
+    tags=["Expenses"],
+)
+def add_expense(
+    trip_id: int,
+    body: AddExpenseRequest,
+    trip_repo=Depends(get_trip_repository),
+    currency_port=Depends(get_currency_port),
+    current_user: User = Depends(get_current_user),
+):
+    splits = [
+        ExpenseSplit(expense_id=None, user_id=s.user_id, share_ratio=s.share_ratio)
+        for s in body.splits
+    ]
+    use_case = AddExpenseUseCase(
+        trip_repository=trip_repo,
+        currency_port=currency_port,
+        split_factory=SplitFactory(),
+    )
+    try:
+        output = use_case.execute(
+            AddExpenseInput(
+                trip_id=trip_id,
+                paid_by=current_user.id,
+                title=body.title,
+                amount=body.amount,
+                currency=body.currency,
+                split_type=body.split_type,
+                category=body.category,
+                splits=splits,
+            )
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
+        )
+
+    return _to_expense_response(output.expense, output.splits)
+
+
+@app.get(
+    "/trips/{trip_id}/expenses",
+    response_model=list[ExpenseResponse],
+    tags=["Expenses"],
+)
+def list_expenses(
+    trip_id: int,
+    trip_repo=Depends(get_trip_repository),
+    _: User = Depends(get_current_user),
+):
+    trip = trip_repo.get_trip(trip_id)
+    if trip is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
+        )
+
+    expenses = trip_repo.list_expenses(trip_id)
+    return [
+        _to_expense_response(expense, trip_repo.get_splits(expense.id))
+        for expense in expenses
+    ]
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────
