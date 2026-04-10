@@ -1,0 +1,38 @@
+[project]
+name = "sharetrip"
+version = "0.1.0"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "taskipy",
+    "httpx"
+]
+
+[tool.taskipy.tasks]
+# Lancer l'application en mode développement
+run = "uvicorn src.sharetrip.main:app --reload"
+
+# Run all tests using pytest
+test = "python -m pytest"
+
+# Run tests and generate a coverage report for the 'src' module
+cov = "python -m pytest --cov=src --cov-fail-under=80"
+
+# Check code quality and style using Ruff (Linter)
+lint = "python -m ruff check ."
+lint-fix = "python -m ruff check . --fix"
+
+# Automatically fix linting errors and reformat code
+format = "python -m ruff format ."
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
