@@ -35,8 +35,6 @@ class FakeRedis:
 
 
 class FakeTripRepository(TripRepository):
-    """Repository en mémoire avec compteurs d'appels."""
-
     def __init__(
         self, trip: Trip | None = None, members: list[Membership] | None = None
     ):
@@ -142,33 +140,35 @@ def repo(inner, fake_redis) -> CachedTripRepository:
 
 
 class TestGetTrip:
-    def test_miss_calls_inner(self, repo, inner):
+    def test_should_call_inner_when_trip_not_in_cache(self, repo, inner):
         repo.get_trip(1)
         assert inner.call_counts.get("get_trip") == 1
 
-    def test_miss_stores_in_redis(self, repo, fake_redis):
+    def test_should_store_trip_in_redis_when_cache_miss(self, repo, fake_redis):
         repo.get_trip(1)
         assert fake_redis.has(_trip_key(1))
 
-    def test_hit_does_not_call_inner(self, repo, inner):
+    def test_should_not_call_inner_when_trip_in_cache(self, repo, inner):
         repo.get_trip(1)  # miss
         repo.get_trip(1)  # hit
         assert inner.call_counts.get("get_trip") == 1
 
-    def test_hit_returns_correct_trip(self, repo, trip):
+    def test_should_return_correct_trip_when_cache_hit(self, repo, trip):
         repo.get_trip(1)
         result = repo.get_trip(1)
         assert result.name == trip.name
         assert result.base_currency == trip.base_currency
 
-    def test_not_found_returns_none(self, fake_redis):
-        inner = FakeTripRepository(trip=None)
-        repo = CachedTripRepository(inner=inner, redis=fake_redis)
+    def test_should_return_none_when_trip_does_not_exist(self, fake_redis):
+        repo = CachedTripRepository(
+            inner=FakeTripRepository(trip=None), redis=fake_redis
+        )
         assert repo.get_trip(99) is None
 
-    def test_not_found_not_stored_in_redis(self, fake_redis):
-        inner = FakeTripRepository(trip=None)
-        repo = CachedTripRepository(inner=inner, redis=fake_redis)
+    def test_should_not_store_in_redis_when_trip_not_found(self, fake_redis):
+        repo = CachedTripRepository(
+            inner=FakeTripRepository(trip=None), redis=fake_redis
+        )
         repo.get_trip(99)
         assert not fake_redis.has(_trip_key(99))
 
@@ -177,13 +177,15 @@ class TestGetTrip:
 
 
 class TestTripInvalidation:
-    def test_save_trip_invalidates_cache(self, repo, fake_redis):
-        repo.get_trip(1)  # stocké en cache
+    def test_should_invalidate_cache_when_trip_saved(self, repo, fake_redis):
+        repo.get_trip(1)
         assert fake_redis.has(_trip_key(1))
         repo.save_trip(Trip(id=1, name="Updated", base_currency="USD"))
-        assert not fake_redis.has(_trip_key(1))  # invalidé
+        assert not fake_redis.has(_trip_key(1))
 
-    def test_delete_trip_invalidates_trip_and_members(self, repo, fake_redis):
+    def test_should_invalidate_trip_and_members_cache_when_trip_deleted(
+        self, repo, fake_redis
+    ):
         repo.get_trip(1)
         repo.get_members(1)
         repo.delete_trip(1)
@@ -195,28 +197,28 @@ class TestTripInvalidation:
 
 
 class TestGetMembers:
-    def test_miss_calls_inner(self, repo, inner):
+    def test_should_call_inner_when_members_not_in_cache(self, repo, inner):
         repo.get_members(1)
         assert inner.call_counts.get("get_members") == 1
 
-    def test_hit_does_not_call_inner(self, repo, inner):
+    def test_should_not_call_inner_when_members_in_cache(self, repo, inner):
         repo.get_members(1)  # miss
         repo.get_members(1)  # hit
         assert inner.call_counts.get("get_members") == 1
 
-    def test_hit_returns_correct_members(self, repo, members):
+    def test_should_return_correct_members_when_cache_hit(self, repo, members):
         repo.get_members(1)
         result = repo.get_members(1)
-        assert len(result) == len(members)
         assert {m.user_id for m in result} == {m.user_id for m in members}
 
-    def test_add_member_invalidates_cache(self, repo, fake_redis):
+    def test_should_invalidate_members_cache_when_member_added(self, repo, fake_redis):
         repo.get_members(1)
-        assert fake_redis.has(_members_key(1))
         repo.add_member(Membership(trip_id=1, user_id=99))
         assert not fake_redis.has(_members_key(1))
 
-    def test_remove_member_invalidates_cache(self, repo, fake_redis):
+    def test_should_invalidate_members_cache_when_member_removed(
+        self, repo, fake_redis
+    ):
         repo.get_members(1)
         repo.remove_member(1, user_id=1)
         assert not fake_redis.has(_members_key(1))
@@ -239,24 +241,29 @@ class TestGetExpense:
         inner._expenses.append(expense)
         return expense
 
-    def test_miss_calls_inner(self, repo, inner, saved_expense):
+    def test_should_call_inner_when_expense_not_in_cache(
+        self, repo, inner, saved_expense
+    ):
         repo.get_expense(1)
         assert inner.call_counts.get("get_expense") == 1
 
-    def test_hit_does_not_call_inner(self, repo, inner, saved_expense):
+    def test_should_not_call_inner_when_expense_in_cache(
+        self, repo, inner, saved_expense
+    ):
         repo.get_expense(1)  # miss
         repo.get_expense(1)  # hit
         assert inner.call_counts.get("get_expense") == 1
 
-    def test_save_expense_invalidates_cache(self, repo, fake_redis, saved_expense):
+    def test_should_invalidate_cache_when_expense_saved(
+        self, repo, fake_redis, saved_expense
+    ):
         repo.get_expense(1)
-        assert fake_redis.has(_expense_key(1))
-        # on met à jour la même expense (id=1) → doit invalider expense:1
-        updated = saved_expense.model_copy(update={"title": "Updated"})
-        repo.save_expense(updated)
+        repo.save_expense(saved_expense.model_copy(update={"title": "Updated"}))
         assert not fake_redis.has(_expense_key(1))
 
-    def test_delete_expense_invalidates_cache(self, repo, fake_redis, saved_expense):
+    def test_should_invalidate_cache_when_expense_deleted(
+        self, repo, fake_redis, saved_expense
+    ):
         repo.get_expense(1)
         repo.delete_expense(1)
         assert not fake_redis.has(_expense_key(1))

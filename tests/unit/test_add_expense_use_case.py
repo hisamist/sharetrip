@@ -13,8 +13,6 @@ from sharetrip.use_cases.add_expense import AddExpenseInput, AddExpenseUseCase
 
 
 class StubCurrencyPort(CurrencyPort):
-    """Retourne un taux fixe — aucun appel HTTP."""
-
     def __init__(self, rate: float = 0.0061):
         self._rate = rate
 
@@ -25,8 +23,6 @@ class StubCurrencyPort(CurrencyPort):
 
 
 class StubTripRepository(TripRepository):
-    """Repository en mémoire — aucune base de données."""
-
     def __init__(
         self, trip: Trip | None = None, members: list[Membership] | None = None
     ):
@@ -93,10 +89,7 @@ def trip() -> Trip:
 
 @pytest.fixture
 def two_members() -> list[Membership]:
-    return [
-        Membership(trip_id=1, user_id=1),
-        Membership(trip_id=1, user_id=2),
-    ]
+    return [Membership(trip_id=1, user_id=1), Membership(trip_id=1, user_id=2)]
 
 
 @pytest.fixture
@@ -124,19 +117,23 @@ def _input(**kwargs) -> AddExpenseInput:
 
 
 class TestCurrencyConversion:
-    def test_amount_pivot_converted_correctly(self, use_case):
+    def test_should_convert_amount_to_pivot_currency_when_currencies_differ(
+        self, use_case
+    ):
         output = use_case.execute(_input(amount=5000.0, currency="JPY"))
         assert output.expense.amount_pivot == pytest.approx(30.5)
 
-    def test_exchange_rate_stored(self, use_case):
+    def test_should_store_exchange_rate_when_expense_created(self, use_case):
         output = use_case.execute(_input(amount=5000.0, currency="JPY"))
         assert output.expense.exchange_rate == pytest.approx(0.0061)
 
-    def test_original_currency_stored(self, use_case):
+    def test_should_store_original_currency_when_expense_created(self, use_case):
         output = use_case.execute(_input(currency="JPY"))
         assert output.expense.original_currency == "JPY"
 
-    def test_same_currency_no_conversion(self, trip, two_members):
+    def test_should_not_convert_when_currency_matches_trip_base(
+        self, trip, two_members
+    ):
         uc = AddExpenseUseCase(
             trip_repository=StubTripRepository(trip=trip, members=two_members),
             currency_port=StubCurrencyPort(),
@@ -150,15 +147,17 @@ class TestCurrencyConversion:
 
 
 class TestPersistence:
-    def test_expense_gets_id(self, use_case):
+    def test_should_assign_id_when_expense_saved(self, use_case):
         output = use_case.execute(_input())
         assert output.expense.id is not None
 
-    def test_splits_get_ids(self, use_case):
+    def test_should_assign_ids_when_splits_saved(self, use_case):
         output = use_case.execute(_input())
         assert all(s.id is not None for s in output.splits)
 
-    def test_correct_number_of_splits(self, use_case, two_members):
+    def test_should_create_one_split_per_member_when_equal_split(
+        self, use_case, two_members
+    ):
         output = use_case.execute(_input(split_type=SplitType.EQUAL))
         assert len(output.splits) == len(two_members)
 
@@ -167,12 +166,11 @@ class TestPersistence:
 
 
 class TestSplitStrategies:
-    def test_equal_split(self, use_case):
+    def test_should_split_equally_when_split_type_is_equal(self, use_case):
         output = use_case.execute(_input(amount=5000.0, currency="JPY"))
-        # 5000 × 0.0061 = 30.5 EUR → 15.25 chacun
         assert all(s.amount_owed == pytest.approx(15.25) for s in output.splits)
 
-    def test_percentage_split(self, trip):
+    def test_should_split_by_weight_when_split_type_is_percentage(self, trip):
         members = [
             Membership(trip_id=1, user_id=1, weight_percentage=60),
             Membership(trip_id=1, user_id=2, weight_percentage=40),
@@ -189,17 +187,18 @@ class TestSplitStrategies:
         assert amounts[1] == pytest.approx(60.0)
         assert amounts[2] == pytest.approx(40.0)
 
-    def test_sum_of_splits_equals_amount_pivot(self, use_case):
+    def test_should_sum_splits_to_amount_pivot_when_expense_created(self, use_case):
         output = use_case.execute(_input(amount=5000.0, currency="JPY"))
-        total = sum(s.amount_owed for s in output.splits)
-        assert total == pytest.approx(output.expense.amount_pivot)
+        assert sum(s.amount_owed for s in output.splits) == pytest.approx(
+            output.expense.amount_pivot
+        )
 
 
 # ─── Cas d'erreur ─────────────────────────────────────────────────────────────
 
 
 class TestErrors:
-    def test_trip_not_found_raises(self, two_members):
+    def test_should_raise_when_trip_not_found(self, two_members):
         uc = AddExpenseUseCase(
             trip_repository=StubTripRepository(trip=None, members=two_members),
             currency_port=StubCurrencyPort(),
@@ -208,7 +207,7 @@ class TestErrors:
         with pytest.raises(ValueError, match="not found"):
             uc.execute(_input())
 
-    def test_no_members_raises(self, trip):
+    def test_should_raise_when_trip_has_no_members(self, trip):
         uc = AddExpenseUseCase(
             trip_repository=StubTripRepository(trip=trip, members=[]),
             currency_port=StubCurrencyPort(),

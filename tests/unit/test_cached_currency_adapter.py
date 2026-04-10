@@ -13,10 +13,8 @@ from sharetrip.infrastructure.cache.cached_currency_adapter import (
 
 
 class FakeRedis:
-    """Redis en mémoire — aucun Docker requis."""
-
     def __init__(self):
-        self._store: dict[str, bytes] = {}
+        self._store: dict[str, str] = {}
 
     def get(self, key: str) -> bytes | None:
         value = self._store.get(key)
@@ -61,64 +59,60 @@ def adapter(inner, fake_redis) -> CachedCurrencyAdapter:
     return CachedCurrencyAdapter(inner=inner, redis=fake_redis)
 
 
-# ─── Cache miss → appel interne ───────────────────────────────────────────────
+# ─── Cache miss ───────────────────────────────────────────────────────────────
 
 
 class TestCacheMiss:
-    def test_calls_inner_on_miss(self, adapter, inner):
+    def test_should_call_inner_adapter_when_cache_miss(self, adapter, inner):
         adapter.get_rate("JPY", "EUR")
         assert inner.call_count == 1
 
-    def test_returns_correct_rate_on_miss(self, adapter):
-        rate = adapter.get_rate("JPY", "EUR")
-        assert rate == pytest.approx(0.0061)
+    def test_should_return_correct_rate_when_cache_miss(self, adapter):
+        assert adapter.get_rate("JPY", "EUR") == pytest.approx(0.0061)
 
-    def test_stores_rate_in_redis(self, adapter, fake_redis):
+    def test_should_store_rate_in_redis_when_cache_miss(self, adapter, fake_redis):
         adapter.get_rate("JPY", "EUR")
-        key = _cache_key("JPY", "EUR", date.today())
-        assert fake_redis.has(key)
+        assert fake_redis.has(_cache_key("JPY", "EUR", date.today()))
 
 
-# ─── Cache hit → pas d'appel interne ─────────────────────────────────────────
+# ─── Cache hit ────────────────────────────────────────────────────────────────
 
 
 class TestCacheHit:
-    def test_does_not_call_inner_on_hit(self, adapter, inner):
-        adapter.get_rate("JPY", "EUR")  # miss → stocké
-        adapter.get_rate("JPY", "EUR")  # hit  → pas d'appel
+    def test_should_not_call_inner_adapter_when_cache_hit(self, adapter, inner):
+        adapter.get_rate("JPY", "EUR")  # miss
+        adapter.get_rate("JPY", "EUR")  # hit
         assert inner.call_count == 1
 
-    def test_returns_cached_rate(self, adapter):
+    def test_should_return_same_rate_when_cache_hit(self, adapter):
         first = adapter.get_rate("JPY", "EUR")
         second = adapter.get_rate("JPY", "EUR")
         assert first == pytest.approx(second)
 
-    def test_hit_reads_from_redis_not_inner(self, inner, fake_redis):
-        key = _cache_key("JPY", "EUR", date.today())
-        fake_redis.set(key, "0.0099")  # valeur pré-chargée en cache
-
+    def test_should_read_from_redis_when_value_preloaded(self, inner, fake_redis):
+        fake_redis.set(_cache_key("JPY", "EUR", date.today()), "0.0099")
         adapter = CachedCurrencyAdapter(inner=inner, redis=fake_redis)
-        rate = adapter.get_rate("JPY", "EUR")
-
-        assert rate == pytest.approx(0.0099)
-        assert inner.call_count == 0  # inner jamais appelé
+        assert adapter.get_rate("JPY", "EUR") == pytest.approx(0.0099)
+        assert inner.call_count == 0
 
 
 # ─── Cas particuliers ─────────────────────────────────────────────────────────
 
 
 class TestEdgeCases:
-    def test_same_currency_returns_one_without_redis(self, adapter, inner, fake_redis):
-        rate = adapter.get_rate("EUR", "EUR")
-        assert rate == 1.0
+    def test_should_return_one_without_redis_when_currencies_are_same(
+        self, adapter, inner, fake_redis
+    ):
+        assert adapter.get_rate("EUR", "EUR") == 1.0
         assert inner.call_count == 0
         assert not fake_redis.has(_cache_key("EUR", "EUR", date.today()))
 
-    def test_different_pairs_cached_independently(self, adapter, inner):
+    def test_should_cache_each_pair_independently_when_different_currencies(
+        self, adapter, inner
+    ):
         adapter.get_rate("JPY", "EUR")
         adapter.get_rate("USD", "EUR")
         assert inner.call_count == 2
-
         adapter.get_rate("JPY", "EUR")  # hit
         adapter.get_rate("USD", "EUR")  # hit
-        assert inner.call_count == 2  # toujours 2
+        assert inner.call_count == 2
