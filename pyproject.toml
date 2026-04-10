@@ -6,7 +6,8 @@ dependencies = [
     "uvicorn",
     "pydantic",
     "sqlalchemy",
-    "alembic"
+    "alembic",
+    "redis"
 ]
 
 [project.optional-dependencies]
