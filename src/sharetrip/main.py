@@ -22,6 +22,10 @@ from sharetrip.infrastructure.cache.cached_trip_repository import CachedTripRepo
 from sharetrip.infrastructure.db.sql_trip_repository import SQLTripRepository
 from sharetrip.infrastructure.db.sql_user_repository import SQLUserRepository
 from sharetrip.use_cases.add_expense import AddExpenseInput, AddExpenseUseCase
+from sharetrip.use_cases.compute_settlements import (
+    ComputeSettlementsInput,
+    ComputeSettlementsUseCase,
+)
 from sharetrip.use_cases.login_user import LoginInput, LoginUseCase
 from sharetrip.use_cases.register_user import RegisterInput, RegisterUseCase
 
@@ -373,6 +377,42 @@ def list_expenses(
     return [
         _to_expense_response(expense, trip_repo.get_splits(expense.id))
         for expense in expenses
+    ]
+
+
+# ─── Routes Settlements ───────────────────────────────────────────────────────
+
+
+class TransferResponse(BaseModel):
+    from_user_id: int
+    to_user_id: int
+    amount: float
+
+
+@app.get(
+    "/trips/{trip_id}/settlements",
+    response_model=list[TransferResponse],
+    tags=["Settlements"],
+)
+def get_settlements(
+    trip_id: int,
+    trip_repo=Depends(get_trip_repository),
+    _: User = Depends(get_current_user),
+):
+    try:
+        output = ComputeSettlementsUseCase(trip_repo).execute(
+            ComputeSettlementsInput(trip_id=trip_id)
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+    return [
+        TransferResponse(
+            from_user_id=t.from_user_id,
+            to_user_id=t.to_user_id,
+            amount=t.amount,
+        )
+        for t in output.transfers
     ]
 
 
