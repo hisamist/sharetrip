@@ -9,7 +9,8 @@ dependencies = [
     "sqlalchemy",
     "alembic",
     "redis",
-    "httpx"
+    "httpx",
+    "psycopg2-binary"
 ]
 
 [project.optional-dependencies]
