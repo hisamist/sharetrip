@@ -347,3 +347,130 @@ class TestExpenses:
         assert data["original_currency"] == "JPY"
         assert data["exchange_rate"] == 1.0
         assert data["amount_pivot"] == 1500.0
+
+
+# ─── Settlements ──────────────────────────────────────────────────────────────
+
+
+class TestSettlements:
+    @pytest.fixture()
+    def setup(self, client):
+        """Two users, one trip, Alice pays for both."""
+        token_alice = _register_and_login(client, "alice@example.com")
+        token_bob = _register_and_login(client, "bob@example.com")
+
+        trip = client.post(
+            "/trips",
+            json={"name": "Tokyo", "base_currency": "EUR"},
+            headers=_auth(token_alice),
+        ).json()
+
+        bob_id = client.get("/auth/me", headers=_auth(token_bob)).json()["id"]
+        client.post(
+            f"/trips/{trip['id']}/members",
+            params={"user_id": bob_id},
+            headers=_auth(token_alice),
+        )
+
+        alice_id = client.get("/auth/me", headers=_auth(token_alice)).json()["id"]
+
+        return {
+            "trip": trip,
+            "token_alice": token_alice,
+            "token_bob": token_bob,
+            "alice_id": alice_id,
+            "bob_id": bob_id,
+        }
+
+    def test_should_return_empty_list_when_no_expenses(self, client, setup):
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/settlements",
+            headers=_auth(setup["token_alice"]),
+        )
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_should_return_transfer_when_alice_paid_for_both(self, client, setup):
+        """Alice pays 100 split equally → Bob owes Alice 50."""
+        client.post(
+            f"/trips/{setup['trip']['id']}/expenses",
+            json={
+                "title": "Dinner",
+                "amount": 100.0,
+                "currency": "EUR",
+                "split_type": "equal",
+            },
+            headers=_auth(setup["token_alice"]),
+        )
+
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/settlements",
+            headers=_auth(setup["token_alice"]),
+        )
+        assert resp.status_code == 200
+        transfers = resp.json()
+        assert len(transfers) == 1
+        assert transfers[0]["from_user_id"] == setup["bob_id"]
+        assert transfers[0]["to_user_id"] == setup["alice_id"]
+        assert abs(transfers[0]["amount"] - 50.0) < 0.01
+
+    def test_should_return_no_transfers_when_expenses_are_balanced(self, client, setup):
+        """Alice pays 60, Bob pays 60, equal split → zero net."""
+        client.post(
+            f"/trips/{setup['trip']['id']}/expenses",
+            json={
+                "title": "Lunch",
+                "amount": 60.0,
+                "currency": "EUR",
+                "split_type": "equal",
+            },
+            headers=_auth(setup["token_alice"]),
+        )
+        client.post(
+            f"/trips/{setup['trip']['id']}/expenses",
+            json={
+                "title": "Dinner",
+                "amount": 60.0,
+                "currency": "EUR",
+                "split_type": "equal",
+            },
+            headers=_auth(setup["token_bob"]),
+        )
+
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/settlements",
+            headers=_auth(setup["token_alice"]),
+        )
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_should_accumulate_across_multiple_expenses(self, client, setup):
+        """Alice pays 60 + 40 = 100 total → Bob owes 50."""
+        for amount in [60.0, 40.0]:
+            client.post(
+                f"/trips/{setup['trip']['id']}/expenses",
+                json={
+                    "title": "Expense",
+                    "amount": amount,
+                    "currency": "EUR",
+                    "split_type": "equal",
+                },
+                headers=_auth(setup["token_alice"]),
+            )
+
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/settlements",
+            headers=_auth(setup["token_alice"]),
+        )
+        transfers = resp.json()
+        assert len(transfers) == 1
+        assert abs(transfers[0]["amount"] - 50.0) < 0.01
+
+    def test_should_return_404_when_trip_does_not_exist(self, client):
+        token = _register_and_login(client)
+        resp = client.get("/trips/9999/settlements", headers=_auth(token))
+        assert resp.status_code == 404
+
+    def test_should_return_401_when_token_is_missing(self, client):
+        resp = client.get("/trips/1/settlements")
+        assert resp.status_code == 401
