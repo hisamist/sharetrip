@@ -1,5 +1,9 @@
 from fastapi import Depends, FastAPI
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
+from sharetrip.api.limiter import limiter
 from sharetrip.api.routers import auth, expenses, settlements, trips
 from sharetrip.config import Settings, get_settings
 
@@ -8,6 +12,10 @@ app = FastAPI(
     description="Enterprise-grade settlement engine with Clean Architecture",
     version="0.1.0",
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(auth.router)
 app.include_router(trips.router)

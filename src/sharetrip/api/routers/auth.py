@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from sharetrip.api.dependencies import get_current_user, get_db_session, get_jwt_service
+from sharetrip.api.limiter import limiter
 from sharetrip.api.schemas.auth import (
     LoginRequest,
     RegisterRequest,
@@ -49,7 +50,9 @@ def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 def login(
+    request: Request,
     body: LoginRequest,
     session: Session = Depends(get_db_session),
     jwt_service: JWTService = Depends(get_jwt_service),

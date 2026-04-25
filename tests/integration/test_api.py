@@ -113,6 +113,91 @@ def _auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+# ─── Validation (422) ─────────────────────────────────────────────────────────
+
+
+class TestValidation:
+    def test_should_return_422_when_register_missing_email(self, client):
+        resp = client.post(
+            "/auth/register",
+            json={"username": "bob", "display_name": "Bob", "password": "s3cr3t"},
+        )
+        assert resp.status_code == 422
+
+    def test_should_return_422_when_register_missing_username(self, client):
+        resp = client.post(
+            "/auth/register",
+            json={
+                "display_name": "Bob",
+                "email": "bob@example.com",
+                "password": "s3cr3t",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_should_return_422_when_register_missing_password(self, client):
+        resp = client.post(
+            "/auth/register",
+            json={"username": "bob", "display_name": "Bob", "email": "bob@example.com"},
+        )
+        assert resp.status_code == 422
+
+    def test_should_return_422_when_create_trip_missing_currency(self, client):
+        token = _register_and_login(client)
+        resp = client.post("/trips", json={"name": "Paris"}, headers=_auth(token))
+        assert resp.status_code == 422
+
+    def test_should_return_422_when_create_trip_missing_name(self, client):
+        token = _register_and_login(client)
+        resp = client.post(
+            "/trips", json={"base_currency": "EUR"}, headers=_auth(token)
+        )
+        assert resp.status_code == 422
+
+    def test_should_return_422_when_expense_invalid_split_type(self, client):
+        token = _register_and_login(client)
+        trip_id = client.post(
+            "/trips",
+            json={"name": "Trip", "base_currency": "EUR"},
+            headers=_auth(token),
+        ).json()["id"]
+        resp = client.post(
+            f"/trips/{trip_id}/expenses",
+            json={
+                "title": "Dinner",
+                "amount": 100.0,
+                "currency": "EUR",
+                "split_type": "INVALID",
+            },
+            headers=_auth(token),
+        )
+        assert resp.status_code == 422
+
+    def test_should_return_422_when_expense_missing_title(self, client):
+        token = _register_and_login(client)
+        trip_id = client.post(
+            "/trips",
+            json={"name": "Trip", "base_currency": "EUR"},
+            headers=_auth(token),
+        ).json()["id"]
+        resp = client.post(
+            f"/trips/{trip_id}/expenses",
+            json={"amount": 100.0, "currency": "EUR", "split_type": "equal"},
+            headers=_auth(token),
+        )
+        assert resp.status_code == 422
+
+    def test_should_return_422_when_add_member_missing_user_id(self, client):
+        token = _register_and_login(client)
+        trip_id = client.post(
+            "/trips",
+            json={"name": "Trip", "base_currency": "EUR"},
+            headers=_auth(token),
+        ).json()["id"]
+        resp = client.post(f"/trips/{trip_id}/members", json={}, headers=_auth(token))
+        assert resp.status_code == 422
+
+
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
 
@@ -188,6 +273,26 @@ class TestAuth:
     def test_should_return_401_when_token_is_missing(self, client):
         resp = client.get("/auth/me")
         assert resp.status_code == 401
+
+    def test_should_return_429_after_too_many_login_attempts(self, client):
+        client.post(
+            "/auth/register",
+            json={
+                "username": "victim",
+                "display_name": "Victim",
+                "email": "victim@example.com",
+                "password": "s3cr3t",
+            },
+        )
+        for _ in range(5):
+            client.post(
+                "/auth/login",
+                json={"email": "victim@example.com", "password": "s3cr3t"},
+            )
+        resp = client.post(
+            "/auth/login", json={"email": "victim@example.com", "password": "s3cr3t"}
+        )
+        assert resp.status_code == 429
 
 
 # ─── Trips ────────────────────────────────────────────────────────────────────
