@@ -94,9 +94,7 @@ class CachedTripRepository(TripRepository):
 
         expense = self._inner.get_expense(expense_id)
         if expense is not None:
-            self._redis.set(
-                _expense_key(expense_id), expense.model_dump_json(), ex=_TTL
-            )
+            self._redis.set(_expense_key(expense_id), expense.model_dump_json(), ex=_TTL)
         return expense
 
     def list_expenses(self, trip_id: int) -> list[Expense]:

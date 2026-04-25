@@ -1,13 +1,11 @@
 from datetime import date
 
 import pytest
-
 from sharetrip.domain.interfaces.currency_port import CurrencyPort
 from sharetrip.infrastructure.cache.cached_currency_adapter import (
     CachedCurrencyAdapter,
     _cache_key,
 )
-
 
 # ─── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -107,9 +105,7 @@ class TestEdgeCases:
         assert inner.call_count == 0
         assert not fake_redis.has(_cache_key("EUR", "EUR", date.today()))
 
-    def test_should_cache_each_pair_independently_when_different_currencies(
-        self, adapter, inner
-    ):
+    def test_should_cache_each_pair_independently_when_different_currencies(self, adapter, inner):
         adapter.get_rate("JPY", "EUR")
         adapter.get_rate("USD", "EUR")
         assert inner.call_count == 2

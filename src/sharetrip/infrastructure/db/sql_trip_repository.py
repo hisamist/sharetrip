@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
-from sharetrip.domain.entities.membership import Membership, MemberRole
-from sharetrip.domain.entities.trip import Trip, SettlementMethod, RoundingStrategy
+from sharetrip.domain.entities.membership import MemberRole, Membership
+from sharetrip.domain.entities.trip import RoundingStrategy, SettlementMethod, Trip
 from sharetrip.domain.interfaces.trip_repository import TripRepository
 from sharetrip.infrastructure.db.models import (
     ExpenseORM,
@@ -76,11 +76,7 @@ class SQLTripRepository(TripRepository):
     # ─── Members ──────────────────────────────────────────────────────────────
 
     def get_members(self, trip_id: int) -> list[Membership]:
-        rows = (
-            self._session.query(MembershipORM)
-            .filter(MembershipORM.trip_id == trip_id)
-            .all()
-        )
+        rows = self._session.query(MembershipORM).filter(MembershipORM.trip_id == trip_id).all()
         return [self._membership_to_domain(r) for r in rows]
 
     def add_member(self, membership: Membership) -> Membership:
@@ -117,9 +113,7 @@ class SQLTripRepository(TripRepository):
         return self._expense_to_domain(row)
 
     def list_expenses(self, trip_id: int) -> list[Expense]:
-        rows = (
-            self._session.query(ExpenseORM).filter(ExpenseORM.trip_id == trip_id).all()
-        )
+        rows = self._session.query(ExpenseORM).filter(ExpenseORM.trip_id == trip_id).all()
         return [self._expense_to_domain(r) for r in rows]
 
     def delete_expense(self, expense_id: int) -> None:

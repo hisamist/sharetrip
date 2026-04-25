@@ -15,9 +15,7 @@ class RegisterInput:
 
 
 class RegisterUseCase:
-    def __init__(
-        self, user_repository: UserRepository, password_service: PasswordService
-    ) -> None:
+    def __init__(self, user_repository: UserRepository, password_service: PasswordService) -> None:
         self._repo = user_repository
         self._passwords = password_service
 

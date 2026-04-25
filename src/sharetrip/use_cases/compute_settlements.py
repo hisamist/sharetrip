@@ -37,15 +37,11 @@ class ComputeSettlementsUseCase:
         expenses = self._repo.list_expenses(input.trip_id)
         for expense in expenses:
             # payer is credited the full pivot amount
-            balances[expense.paid_by] = (
-                balances.get(expense.paid_by, 0.0) + expense.amount_pivot
-            )
+            balances[expense.paid_by] = balances.get(expense.paid_by, 0.0) + expense.amount_pivot
 
             splits = self._repo.get_splits(expense.id)
             for split in splits:
-                balances[split.user_id] = (
-                    balances.get(split.user_id, 0.0) - split.amount_owed
-                )
+                balances[split.user_id] = balances.get(split.user_id, 0.0) - split.amount_owed
 
         # 2. Minimize transfers (greedy)
         creditors = sorted(
@@ -64,9 +60,7 @@ class ComputeSettlementsUseCase:
             debt_id, debt_amt = debtors[j]
 
             settled = round(min(cred_amt, debt_amt), 2)
-            transfers.append(
-                Transfer(from_user_id=debt_id, to_user_id=cred_id, amount=settled)
-            )
+            transfers.append(Transfer(from_user_id=debt_id, to_user_id=cred_id, amount=settled))
 
             cred_amt -= settled
             debt_amt -= settled

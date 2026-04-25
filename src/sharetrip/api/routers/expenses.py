@@ -74,9 +74,7 @@ def add_expense(
             )
         )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
 
     return _to_expense_response(output.expense, output.splits)
 
@@ -87,7 +85,4 @@ def list_expenses(
     trip_repo=Depends(get_trip_repository),
 ):
     expenses = trip_repo.list_expenses(trip.id)
-    return [
-        _to_expense_response(expense, trip_repo.get_splits(expense.id))
-        for expense in expenses
-    ]
+    return [_to_expense_response(expense, trip_repo.get_splits(expense.id)) for expense in expenses]

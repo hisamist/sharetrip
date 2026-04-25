@@ -1,5 +1,4 @@
 import pytest
-
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.entities.membership import Membership
 from sharetrip.domain.entities.trip import Trip
@@ -8,7 +7,6 @@ from sharetrip.use_cases.compute_settlements import (
     ComputeSettlementsInput,
     ComputeSettlementsUseCase,
 )
-
 
 # ─── Stub ─────────────────────────────────────────────────────────────────────
 
@@ -101,9 +99,7 @@ def _split(expense_id: int, user_id: int, amount_owed: float) -> ExpenseSplit:
 class TestComputeSettlementsUseCase:
     def test_should_return_no_transfers_when_trip_has_no_expenses(self):
         repo = StubTripRepository(trip=_trip(), expenses=[], splits={})
-        result = ComputeSettlementsUseCase(repo).execute(
-            ComputeSettlementsInput(trip_id=1)
-        )
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
         assert result.transfers == []
 
     def test_should_raise_when_trip_does_not_exist(self):
@@ -121,9 +117,7 @@ class TestComputeSettlementsUseCase:
             ]
         }
         repo = StubTripRepository(trip=_trip(), expenses=[expense], splits=splits)
-        result = ComputeSettlementsUseCase(repo).execute(
-            ComputeSettlementsInput(trip_id=1)
-        )
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
 
         assert len(result.transfers) == 1
         t = result.transfers[0]
@@ -140,9 +134,7 @@ class TestComputeSettlementsUseCase:
             2: [_split(2, 1, 30.0), _split(2, 2, 30.0)],
         }
         repo = StubTripRepository(trip=_trip(), expenses=[e1, e2], splits=splits)
-        result = ComputeSettlementsUseCase(repo).execute(
-            ComputeSettlementsInput(trip_id=1)
-        )
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
 
         assert result.transfers == []
 
@@ -161,9 +153,7 @@ class TestComputeSettlementsUseCase:
             ]
         }
         repo = StubTripRepository(trip=_trip(), expenses=[expense], splits=splits)
-        result = ComputeSettlementsUseCase(repo).execute(
-            ComputeSettlementsInput(trip_id=1)
-        )
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
 
         assert len(result.transfers) == 2
         assert all(t.to_user_id == 1 for t in result.transfers)
@@ -183,9 +173,7 @@ class TestComputeSettlementsUseCase:
             2: [_split(2, 1, 20.0), _split(2, 2, 20.0)],
         }
         repo = StubTripRepository(trip=_trip(), expenses=[e1, e2], splits=splits)
-        result = ComputeSettlementsUseCase(repo).execute(
-            ComputeSettlementsInput(trip_id=1)
-        )
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
 
         assert len(result.transfers) == 1
         t = result.transfers[0]
@@ -204,9 +192,7 @@ class TestComputeSettlementsUseCase:
             ]
         }
         repo = StubTripRepository(trip=_trip(), expenses=[expense], splits=splits)
-        result = ComputeSettlementsUseCase(repo).execute(
-            ComputeSettlementsInput(trip_id=1)
-        )
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
 
         total_transferred = sum(t.amount for t in result.transfers)
         assert abs(total_transferred - 200.0) < 0.01

@@ -1,12 +1,10 @@
 import pytest
-
 from sharetrip.domain.entities.user import User
 from sharetrip.domain.interfaces.user_repository import UserRepository
 from sharetrip.infrastructure.auth.jwt_service import JWTService
 from sharetrip.infrastructure.auth.password_service import PasswordService
 from sharetrip.use_cases.login_user import LoginInput, LoginUseCase
 from sharetrip.use_cases.register_user import RegisterInput, RegisterUseCase
-
 
 # ─── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -73,9 +71,7 @@ class TestRegisterUseCase:
     def test_should_return_saved_user_when_registration_is_valid(
         self, empty_repo: StubUserRepository, password_service: PasswordService
     ):
-        use_case = RegisterUseCase(
-            user_repository=empty_repo, password_service=password_service
-        )
+        use_case = RegisterUseCase(user_repository=empty_repo, password_service=password_service)
         result = use_case.execute(
             RegisterInput(
                 username="bob",
@@ -93,9 +89,7 @@ class TestRegisterUseCase:
     def test_should_hash_password_when_user_is_registered(
         self, empty_repo: StubUserRepository, password_service: PasswordService
     ):
-        use_case = RegisterUseCase(
-            user_repository=empty_repo, password_service=password_service
-        )
+        use_case = RegisterUseCase(user_repository=empty_repo, password_service=password_service)
         result = use_case.execute(
             RegisterInput(
                 username="bob",
@@ -111,9 +105,7 @@ class TestRegisterUseCase:
     def test_should_persist_optional_phone_when_provided(
         self, empty_repo: StubUserRepository, password_service: PasswordService
     ):
-        use_case = RegisterUseCase(
-            user_repository=empty_repo, password_service=password_service
-        )
+        use_case = RegisterUseCase(user_repository=empty_repo, password_service=password_service)
         result = use_case.execute(
             RegisterInput(
                 username="bob",
@@ -161,9 +153,7 @@ class TestRegisterUseCase:
     def test_should_store_user_in_repository_when_registration_succeeds(
         self, empty_repo: StubUserRepository, password_service: PasswordService
     ):
-        use_case = RegisterUseCase(
-            user_repository=empty_repo, password_service=password_service
-        )
+        use_case = RegisterUseCase(user_repository=empty_repo, password_service=password_service)
         use_case.execute(
             RegisterInput(
                 username="carol",
@@ -243,9 +233,7 @@ class TestLoginUseCase:
             jwt_service=jwt_service,
         )
         with pytest.raises(ValueError, match="Invalid email or password"):
-            use_case.execute(
-                LoginInput(email="alice@example.com", password="wrong-password")
-            )
+            use_case.execute(LoginInput(email="alice@example.com", password="wrong-password"))
 
     def test_should_not_distinguish_between_wrong_email_and_wrong_password(
         self,
@@ -259,13 +247,9 @@ class TestLoginUseCase:
             password_service=password_service,
             jwt_service=jwt_service,
         )
-        with pytest.raises(
-            ValueError, match="Invalid email or password"
-        ) as exc_wrong_email:
+        with pytest.raises(ValueError, match="Invalid email or password") as exc_wrong_email:
             use_case.execute(LoginInput(email="nobody@example.com", password="any"))
-        with pytest.raises(
-            ValueError, match="Invalid email or password"
-        ) as exc_wrong_pass:
+        with pytest.raises(ValueError, match="Invalid email or password") as exc_wrong_pass:
             use_case.execute(LoginInput(email="alice@example.com", password="wrong"))
 
         assert str(exc_wrong_email.value) == str(exc_wrong_pass.value)

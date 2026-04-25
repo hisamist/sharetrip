@@ -39,7 +39,7 @@ def register(
             )
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
     return UserResponse(
         id=user.id,
@@ -65,7 +65,7 @@ def login(
     try:
         output = use_case.execute(LoginInput(email=body.email, password=body.password))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)) from e
 
     return TokenResponse(access_token=output.access_token)
 

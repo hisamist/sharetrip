@@ -68,20 +68,16 @@ def get_current_user(
 ) -> User:
     """Extrait et valide le JWT — injecte l'utilisateur courant."""
     try:
-        payload = JWTService(settings.jwt_secret_key).decode_token(
-            credentials.credentials
-        )
+        payload = JWTService(settings.jwt_secret_key).decode_token(credentials.credentials)
         user_id = int(payload["sub"])
     except (jwt.InvalidTokenError, KeyError, ValueError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
-        )
+        ) from None
 
     user = SQLUserRepository(session).get_by_id(user_id)
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
 
 
@@ -93,9 +89,7 @@ def require_trip_member(
     """Vérifie que le trip existe et que l'utilisateur courant en est membre."""
     trip = trip_repo.get_trip(trip_id)
     if trip is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found")
 
     members = trip_repo.get_members(trip_id)
     if not any(m.user_id == current_user.id for m in members):

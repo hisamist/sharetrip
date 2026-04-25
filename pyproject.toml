@@ -24,7 +24,8 @@ dev = [
     "pytest-cov",
     "ruff",
     "taskipy",
-    "httpx"
+    "httpx",
+    "pre-commit",
 ]
 
 [tool.taskipy.tasks]
@@ -50,6 +51,33 @@ migrate-down = "alembic downgrade -1"
 migrate-status = "alembic current"
 migrate-history = "alembic history --verbose"
 makemigration = "alembic revision --autogenerate -m"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["alembic/"]          # auto-generated migrations — not our code to lint
+
+[tool.ruff.lint]
+# E/W : PEP 8 style (indentation, whitespace, blank lines)
+# F   : pyflakes — unused imports, undefined names
+# I   : isort   — consistent import ordering
+# B   : bugbear — likely bugs and bad design patterns
+# UP  : pyupgrade — enforces modern Python syntax (e.g. X | Y instead of Union)
+# C90 : mccabe  — flags functions with cyclomatic complexity > 10
+select = ["E", "W", "F", "I", "B", "UP", "C90"]
+ignore = [
+    "B008",  # FastAPI's Depends() in default args is the intended DI pattern
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]      # assert is the standard assertion mechanism in pytest
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,7 +1,6 @@
 import logging
 
 import pytest
-
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.entities.membership import Membership
 from sharetrip.domain.entities.trip import Trip
@@ -11,7 +10,6 @@ from sharetrip.domain.interfaces.trip_repository import TripRepository
 from sharetrip.domain.services.split_factory import SplitFactory
 from sharetrip.infrastructure.notifications.log_observer import LogNotificationObserver
 from sharetrip.use_cases.add_expense import AddExpenseInput, AddExpenseUseCase
-
 
 # ─── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -123,9 +121,7 @@ def expense_input():
 
 
 class TestExpenseObserverContract:
-    def test_should_call_observer_once_when_expense_is_created(
-        self, trip, members, expense_input
-    ):
+    def test_should_call_observer_once_when_expense_is_created(self, trip, members, expense_input):
         spy = SpyObserver()
         repo = StubTripRepository(trip=trip, members=members)
         use_case = AddExpenseUseCase(
@@ -169,9 +165,7 @@ class TestExpenseObserverContract:
         assert observed_trip.id == trip.id
         assert observed_trip.name == trip.name
 
-    def test_should_call_all_observers_when_multiple_registered(
-        self, trip, members, expense_input
-    ):
+    def test_should_call_all_observers_when_multiple_registered(self, trip, members, expense_input):
         spy1, spy2 = SpyObserver(), SpyObserver()
         repo = StubTripRepository(trip=trip, members=members)
         use_case = AddExpenseUseCase(
@@ -185,9 +179,7 @@ class TestExpenseObserverContract:
         assert len(spy1.calls) == 1
         assert len(spy2.calls) == 1
 
-    def test_should_not_call_observer_when_none_registered(
-        self, trip, members, expense_input
-    ):
+    def test_should_not_call_observer_when_none_registered(self, trip, members, expense_input):
         spy = SpyObserver()
         repo = StubTripRepository(trip=trip, members=members)
         use_case = AddExpenseUseCase(

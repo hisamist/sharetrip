@@ -1,5 +1,4 @@
 import pytest
-
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.entities.membership import Membership
 from sharetrip.domain.entities.trip import Trip
@@ -7,7 +6,6 @@ from sharetrip.domain.interfaces.currency_port import CurrencyPort
 from sharetrip.domain.interfaces.trip_repository import TripRepository
 from sharetrip.domain.services.split_factory import SplitFactory
 from sharetrip.use_cases.add_expense import AddExpenseInput, AddExpenseUseCase
-
 
 # ─── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -23,9 +21,7 @@ class StubCurrencyPort(CurrencyPort):
 
 
 class StubTripRepository(TripRepository):
-    def __init__(
-        self, trip: Trip | None = None, members: list[Membership] | None = None
-    ):
+    def __init__(self, trip: Trip | None = None, members: list[Membership] | None = None):
         self._trip = trip
         self._members = members or []
         self._expenses: list[Expense] = []
@@ -120,9 +116,7 @@ def _input(**kwargs) -> AddExpenseInput:
 
 
 class TestCurrencyConversion:
-    def test_should_convert_amount_to_pivot_currency_when_currencies_differ(
-        self, use_case
-    ):
+    def test_should_convert_amount_to_pivot_currency_when_currencies_differ(self, use_case):
         output = use_case.execute(_input(amount=5000.0, currency="JPY"))
         assert output.expense.amount_pivot == pytest.approx(30.5)
 
@@ -134,9 +128,7 @@ class TestCurrencyConversion:
         output = use_case.execute(_input(currency="JPY"))
         assert output.expense.original_currency == "JPY"
 
-    def test_should_not_convert_when_currency_matches_trip_base(
-        self, trip, two_members
-    ):
+    def test_should_not_convert_when_currency_matches_trip_base(self, trip, two_members):
         uc = AddExpenseUseCase(
             trip_repository=StubTripRepository(trip=trip, members=two_members),
             currency_port=StubCurrencyPort(),
@@ -158,9 +150,7 @@ class TestPersistence:
         output = use_case.execute(_input())
         assert all(s.id is not None for s in output.splits)
 
-    def test_should_create_one_split_per_member_when_equal_split(
-        self, use_case, two_members
-    ):
+    def test_should_create_one_split_per_member_when_equal_split(self, use_case, two_members):
         output = use_case.execute(_input(split_type=SplitType.EQUAL))
         assert len(output.splits) == len(two_members)
 
@@ -183,9 +173,7 @@ class TestSplitStrategies:
             currency_port=StubCurrencyPort(rate=1.0),
             split_factory=SplitFactory(),
         )
-        output = uc.execute(
-            _input(amount=100.0, currency="EUR", split_type=SplitType.PERCENTAGE)
-        )
+        output = uc.execute(_input(amount=100.0, currency="EUR", split_type=SplitType.PERCENTAGE))
         amounts = {s.user_id: s.amount_owed for s in output.splits}
         assert amounts[1] == pytest.approx(60.0)
         assert amounts[2] == pytest.approx(40.0)

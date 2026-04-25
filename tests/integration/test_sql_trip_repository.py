@@ -1,12 +1,11 @@
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
-from sharetrip.domain.entities.membership import Membership, MemberRole
-from sharetrip.domain.entities.trip import Trip, SettlementMethod, RoundingStrategy
+from sharetrip.domain.entities.membership import MemberRole, Membership
+from sharetrip.domain.entities.trip import RoundingStrategy, SettlementMethod, Trip
 from sharetrip.infrastructure.db.models import Base
 from sharetrip.infrastructure.db.sql_trip_repository import SQLTripRepository
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture(scope="function")
@@ -114,9 +113,7 @@ class TestMemberCRUD:
             repo.remove_member(saved_trip.id, user_id=999)
 
     def test_weight_percentage_persisted(self, repo, saved_trip):
-        repo.add_member(
-            Membership(trip_id=saved_trip.id, user_id=1, weight_percentage=60.0)
-        )
+        repo.add_member(Membership(trip_id=saved_trip.id, user_id=1, weight_percentage=60.0))
         members = repo.get_members(saved_trip.id)
         assert members[0].weight_percentage == 60.0
 

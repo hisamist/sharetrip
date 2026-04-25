@@ -1,5 +1,4 @@
 import pytest
-
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.entities.membership import Membership
 from sharetrip.domain.entities.trip import Trip
@@ -10,7 +9,6 @@ from sharetrip.infrastructure.cache.cached_trip_repository import (
     _members_key,
     _trip_key,
 )
-
 
 # ─── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -35,9 +33,7 @@ class FakeRedis:
 
 
 class FakeTripRepository(TripRepository):
-    def __init__(
-        self, trip: Trip | None = None, members: list[Membership] | None = None
-    ):
+    def __init__(self, trip: Trip | None = None, members: list[Membership] | None = None):
         self._trip = trip
         self._members = members or []
         self._expenses: list[Expense] = []
@@ -178,15 +174,11 @@ class TestGetTrip:
         assert result.base_currency == trip.base_currency
 
     def test_should_return_none_when_trip_does_not_exist(self, fake_redis):
-        repo = CachedTripRepository(
-            inner=FakeTripRepository(trip=None), redis=fake_redis
-        )
+        repo = CachedTripRepository(inner=FakeTripRepository(trip=None), redis=fake_redis)
         assert repo.get_trip(99) is None
 
     def test_should_not_store_in_redis_when_trip_not_found(self, fake_redis):
-        repo = CachedTripRepository(
-            inner=FakeTripRepository(trip=None), redis=fake_redis
-        )
+        repo = CachedTripRepository(inner=FakeTripRepository(trip=None), redis=fake_redis)
         repo.get_trip(99)
         assert not fake_redis.has(_trip_key(99))
 
@@ -201,9 +193,7 @@ class TestTripInvalidation:
         repo.save_trip(Trip(id=1, name="Updated", base_currency="USD"))
         assert not fake_redis.has(_trip_key(1))
 
-    def test_should_invalidate_trip_and_members_cache_when_trip_deleted(
-        self, repo, fake_redis
-    ):
+    def test_should_invalidate_trip_and_members_cache_when_trip_deleted(self, repo, fake_redis):
         repo.get_trip(1)
         repo.get_members(1)
         repo.delete_trip(1)
@@ -234,9 +224,7 @@ class TestGetMembers:
         repo.add_member(Membership(trip_id=1, user_id=99))
         assert not fake_redis.has(_members_key(1))
 
-    def test_should_invalidate_members_cache_when_member_removed(
-        self, repo, fake_redis
-    ):
+    def test_should_invalidate_members_cache_when_member_removed(self, repo, fake_redis):
         repo.get_members(1)
         repo.remove_member(1, user_id=1)
         assert not fake_redis.has(_members_key(1))
@@ -259,29 +247,21 @@ class TestGetExpense:
         inner._expenses.append(expense)
         return expense
 
-    def test_should_call_inner_when_expense_not_in_cache(
-        self, repo, inner, saved_expense
-    ):
+    def test_should_call_inner_when_expense_not_in_cache(self, repo, inner, saved_expense):
         repo.get_expense(1)
         assert inner.call_counts.get("get_expense") == 1
 
-    def test_should_not_call_inner_when_expense_in_cache(
-        self, repo, inner, saved_expense
-    ):
+    def test_should_not_call_inner_when_expense_in_cache(self, repo, inner, saved_expense):
         repo.get_expense(1)  # miss
         repo.get_expense(1)  # hit
         assert inner.call_counts.get("get_expense") == 1
 
-    def test_should_invalidate_cache_when_expense_saved(
-        self, repo, fake_redis, saved_expense
-    ):
+    def test_should_invalidate_cache_when_expense_saved(self, repo, fake_redis, saved_expense):
         repo.get_expense(1)
         repo.save_expense(saved_expense.model_copy(update={"title": "Updated"}))
         assert not fake_redis.has(_expense_key(1))
 
-    def test_should_invalidate_cache_when_expense_deleted(
-        self, repo, fake_redis, saved_expense
-    ):
+    def test_should_invalidate_cache_when_expense_deleted(self, repo, fake_redis, saved_expense):
         repo.get_expense(1)
         repo.delete_expense(1)
         assert not fake_redis.has(_expense_key(1))

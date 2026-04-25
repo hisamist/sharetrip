@@ -27,6 +27,9 @@ jobs:
         run: |
           pip install .[dev]
 
+      - name: Check formatting
+        run: python -m ruff format --check .
+
       - name: Run linter
         run: task lint
 

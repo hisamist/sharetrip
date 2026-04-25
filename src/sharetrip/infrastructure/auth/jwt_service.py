@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 
@@ -14,8 +14,7 @@ class JWTService:
         payload = {
             "sub": str(user_id),
             "email": email,
-            "exp": datetime.now(timezone.utc)
-            + timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES),
+            "exp": datetime.now(UTC) + timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES),
         }
         return jwt.encode(payload, self._secret, algorithm=_ALGORITHM)
 

@@ -28,7 +28,7 @@ def get_settlements(
             ComputeSettlementsInput(trip_id=trip.id)
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
     return [
         TransferResponse(
@@ -51,7 +51,7 @@ def get_settlements_pdf(
             ComputeSettlementsInput(trip_id=trip.id)
         )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
     expenses = trip_repo.list_expenses(trip.id)
 
@@ -94,7 +94,10 @@ def get_settlements_pdf(
             pdf.cell(
                 0,
                 7,
-                f"  {display(t.from_user_id)}  ->  {display(t.to_user_id)} :  {t.amount:.2f} {trip.base_currency}",
+                (
+                    f"  {display(t.from_user_id)} -> {display(t.to_user_id)}"
+                    f": {t.amount:.2f} {trip.base_currency}"
+                ),
                 new_x="LMARGIN",
                 new_y="NEXT",
             )
@@ -118,7 +121,10 @@ def get_settlements_pdf(
     pdf.set_font("Helvetica", "", 11)
     if expenses:
         for e in expenses:
-            label = f"  {e.title} - {e.amount_pivot:.2f} {trip.base_currency} (paid by {display(e.paid_by)})"
+            label = (
+                f"  {e.title} - {e.amount_pivot:.2f} {trip.base_currency}"
+                f" (paid by {display(e.paid_by)})"
+            )
             if e.category:
                 label += f"  [{e.category}]"
             pdf.cell(0, 7, label, new_x="LMARGIN", new_y="NEXT")
@@ -130,7 +136,5 @@ def get_settlements_pdf(
     return StreamingResponse(
         iter([pdf_bytes]),
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename=sharetrip_trip_{trip.id}.pdf"
-        },
+        headers={"Content-Disposition": f"attachment; filename=sharetrip_trip_{trip.id}.pdf"},
     )

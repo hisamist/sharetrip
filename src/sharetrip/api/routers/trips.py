@@ -25,9 +25,7 @@ def list_my_trips(
     current_user: User = Depends(get_current_user),
 ):
     trips = trip_repo.list_trips_for_user(current_user.id)
-    return [
-        TripResponse(id=t.id, name=t.name, base_currency=t.base_currency) for t in trips
-    ]
+    return [TripResponse(id=t.id, name=t.name, base_currency=t.base_currency) for t in trips]
 
 
 @router.post("", response_model=TripResponse, status_code=201)
@@ -77,14 +75,10 @@ def add_member(
 ):
     user = user_repo.get_by_id(body.user_id)
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     members = trip_repo.get_members(trip.id)
     if any(m.user_id == body.user_id for m in members):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="User is already a member"
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User is already a member")
 
     trip_repo.add_member(Membership(trip_id=trip.id, user_id=body.user_id))

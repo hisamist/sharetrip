@@ -1,5 +1,4 @@
 import pytest
-
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.entities.membership import Membership
 from sharetrip.domain.services.split_factory import SplitFactory
@@ -35,16 +34,12 @@ def base_expense() -> Expense:
 
 
 class TestEqualSplitter:
-    def test_should_split_amount_equally_when_members_are_equal(
-        self, base_expense, three_members
-    ):
+    def test_should_split_amount_equally_when_members_are_equal(self, base_expense, three_members):
         splits = EqualSplitter().calculate(base_expense, three_members)
         assert len(splits) == 3
         assert all(s.amount_owed == 30.0 for s in splits)
 
-    def test_should_sum_to_total_when_splitting_equally(
-        self, base_expense, three_members
-    ):
+    def test_should_sum_to_total_when_splitting_equally(self, base_expense, three_members):
         splits = EqualSplitter().calculate(base_expense, three_members)
         assert sum(s.amount_owed for s in splits) == pytest.approx(90.0)
 
@@ -57,9 +52,7 @@ class TestEqualSplitter:
         with pytest.raises(ValueError, match="no members"):
             EqualSplitter().calculate(base_expense, [])
 
-    def test_should_set_share_ratio_to_one_when_equal_split(
-        self, base_expense, three_members
-    ):
+    def test_should_set_share_ratio_to_one_when_equal_split(self, base_expense, three_members):
         splits = EqualSplitter().calculate(base_expense, three_members)
         assert all(s.share_ratio == 1.0 for s in splits)
 
@@ -167,9 +160,7 @@ class TestSplitFactory:
         assert isinstance(factory.get_strategy(SplitType.EQUAL), EqualSplitter)
 
     def test_should_return_percentage_splitter_when_type_is_percentage(self, factory):
-        assert isinstance(
-            factory.get_strategy(SplitType.PERCENTAGE), PercentageSplitter
-        )
+        assert isinstance(factory.get_strategy(SplitType.PERCENTAGE), PercentageSplitter)
 
     def test_should_return_hybrid_splitter_when_type_is_hybrid(self, factory):
         assert isinstance(factory.get_strategy(SplitType.HYBRID), HybridSplitter)

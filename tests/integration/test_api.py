@@ -6,10 +6,6 @@ No external services required.
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from sharetrip.api.dependencies import (
     get_currency_port,
     get_db_session,
@@ -18,7 +14,9 @@ from sharetrip.api.dependencies import (
 from sharetrip.domain.interfaces.currency_port import CurrencyPort
 from sharetrip.infrastructure.db.models import Base
 from sharetrip.main import app
-
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # ─── Fakes ────────────────────────────────────────────────────────────────────
 
@@ -149,9 +147,7 @@ class TestValidation:
 
     def test_should_return_422_when_create_trip_missing_name(self, client):
         token = _register_and_login(client)
-        resp = client.post(
-            "/trips", json={"base_currency": "EUR"}, headers=_auth(token)
-        )
+        resp = client.post("/trips", json={"base_currency": "EUR"}, headers=_auth(token))
         assert resp.status_code == 422
 
     def test_should_return_422_when_expense_invalid_split_type(self, client):
@@ -242,9 +238,7 @@ class TestAuth:
                 "password": "s3cr3t",
             },
         )
-        resp = client.post(
-            "/auth/login", json={"email": "alice@example.com", "password": "s3cr3t"}
-        )
+        resp = client.post("/auth/login", json={"email": "alice@example.com", "password": "s3cr3t"})
         assert resp.status_code == 200
         assert "access_token" in resp.json()
         assert resp.json()["token_type"] == "bearer"
@@ -259,9 +253,7 @@ class TestAuth:
                 "password": "s3cr3t",
             },
         )
-        resp = client.post(
-            "/auth/login", json={"email": "alice@example.com", "password": "wrong"}
-        )
+        resp = client.post("/auth/login", json={"email": "alice@example.com", "password": "wrong"})
         assert resp.status_code == 401
 
     def test_should_return_current_user_when_token_is_valid(self, client):
@@ -574,9 +566,7 @@ class TestExpenses:
                 headers=_auth(setup["token_alice"]),
             )
 
-        resp = client.get(
-            f"/trips/{trip_id}/expenses", headers=_auth(setup["token_alice"])
-        )
+        resp = client.get(f"/trips/{trip_id}/expenses", headers=_auth(setup["token_alice"]))
         assert resp.status_code == 200
         assert len(resp.json()) == 3
 

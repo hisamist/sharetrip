@@ -30,9 +30,7 @@ class LoginUseCase:
 
     def execute(self, input: LoginInput) -> LoginOutput:
         user = self._repo.get_by_email(input.email)
-        if user is None or not self._passwords.verify(
-            input.password, user.password_hash
-        ):
+        if user is None or not self._passwords.verify(input.password, user.password_hash):
             raise ValueError("Invalid email or password")
 
         token = self._jwt.create_access_token(user_id=user.id, email=user.email)

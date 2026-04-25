@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from sharetrip.infrastructure.adapters.currency_adapter import (
     FrankfurterCurrencyAdapter,
 )
@@ -72,9 +71,7 @@ class TestGetRateErrors:
 
         mock_get.return_value = MagicMock(
             raise_for_status=MagicMock(
-                side_effect=httpx.HTTPStatusError(
-                    "422", request=MagicMock(), response=MagicMock()
-                )
+                side_effect=httpx.HTTPStatusError("422", request=MagicMock(), response=MagicMock())
             )
         )
 
