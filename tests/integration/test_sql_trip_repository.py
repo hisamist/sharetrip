@@ -121,6 +121,32 @@ class TestMemberCRUD:
         assert members[0].weight_percentage == 60.0
 
 
+# ─── list_trips_for_user ──────────────────────────────────────────────────────
+
+
+class TestListTripsForUser:
+    def test_returns_only_trips_user_is_member_of(self, repo):
+        trip_a = repo.save_trip(Trip(name="Trip A", base_currency="EUR"))
+        trip_b = repo.save_trip(Trip(name="Trip B", base_currency="EUR"))
+        repo.save_trip(Trip(name="Trip C", base_currency="EUR"))
+
+        repo.add_member(Membership(trip_id=trip_a.id, user_id=1))
+        repo.add_member(Membership(trip_id=trip_b.id, user_id=1))
+
+        trips = repo.list_trips_for_user(1)
+        assert len(trips) == 2
+        assert {t.name for t in trips} == {"Trip A", "Trip B"}
+
+    def test_returns_empty_when_user_has_no_memberships(self, repo):
+        repo.save_trip(Trip(name="Some Trip", base_currency="EUR"))
+        assert repo.list_trips_for_user(999) == []
+
+    def test_does_not_return_trips_of_other_users(self, repo):
+        trip = repo.save_trip(Trip(name="Alice Trip", base_currency="EUR"))
+        repo.add_member(Membership(trip_id=trip.id, user_id=1))
+        assert repo.list_trips_for_user(2) == []
+
+
 # ─── Expense CRUD ─────────────────────────────────────────────────────────────
 
 

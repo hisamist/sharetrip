@@ -49,6 +49,9 @@ class CachedTripRepository(TripRepository):
     def list_trips(self) -> list[Trip]:
         return self._inner.list_trips()
 
+    def list_trips_for_user(self, user_id: int) -> list[Trip]:
+        return self._inner.list_trips_for_user(user_id)
+
     def save_trip(self, trip: Trip) -> Trip:
         saved = self._inner.save_trip(trip)
         self._redis.delete(_trip_key(saved.id))

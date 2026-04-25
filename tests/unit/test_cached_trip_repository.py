@@ -55,6 +55,10 @@ class FakeTripRepository(TripRepository):
         self._count("list_trips")
         return [self._trip] if self._trip else []
 
+    def list_trips_for_user(self, user_id: int) -> list[Trip]:
+        self._count("list_trips_for_user")
+        return [self._trip] if self._trip else []
+
     def save_trip(self, trip: Trip) -> Trip:
         self._count("save_trip")
         self._trip = trip
@@ -134,6 +138,20 @@ def inner(trip, members) -> FakeTripRepository:
 @pytest.fixture
 def repo(inner, fake_redis) -> CachedTripRepository:
     return CachedTripRepository(inner=inner, redis=fake_redis)
+
+
+# ─── list_trips_for_user ──────────────────────────────────────────────────────
+
+
+class TestListTripsForUser:
+    def test_should_delegate_to_inner(self, repo, inner):
+        repo.list_trips_for_user(1)
+        assert inner.call_counts.get("list_trips_for_user") == 1
+
+    def test_should_return_trips_from_inner(self, repo, trip):
+        result = repo.list_trips_for_user(1)
+        assert len(result) == 1
+        assert result[0].name == trip.name
 
 
 # ─── get_trip ─────────────────────────────────────────────────────────────────

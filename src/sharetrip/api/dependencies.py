@@ -53,6 +53,10 @@ def get_currency_port(
     )
 
 
+def get_user_repository(session: Session = Depends(get_db_session)):
+    return SQLUserRepository(session)
+
+
 def get_jwt_service(settings: Settings = Depends(get_settings)) -> JWTService:
     return JWTService(secret_key=settings.jwt_secret_key)
 
@@ -79,3 +83,24 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
     return user
+
+
+def require_trip_member(
+    trip_id: int,
+    trip_repo=Depends(get_trip_repository),
+    current_user: User = Depends(get_current_user),
+):
+    """Vérifie que le trip existe et que l'utilisateur courant en est membre."""
+    trip = trip_repo.get_trip(trip_id)
+    if trip is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
+        )
+
+    members = trip_repo.get_members(trip_id)
+    if not any(m.user_id == current_user.id for m in members):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not a member of this trip"
+        )
+
+    return trip

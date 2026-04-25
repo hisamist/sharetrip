@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from sharetrip.api.dependencies import (
-    get_current_user,
     get_currency_port,
+    get_current_user,
     get_trip_repository,
+    require_trip_member,
 )
 from sharetrip.api.schemas.expenses import (
     AddExpenseRequest,
@@ -43,8 +44,8 @@ def _to_expense_response(expense, splits) -> ExpenseResponse:
 
 @router.post("/{trip_id}/expenses", response_model=ExpenseResponse, status_code=201)
 def add_expense(
-    trip_id: int,
     body: AddExpenseRequest,
+    trip=Depends(require_trip_member),
     trip_repo=Depends(get_trip_repository),
     currency_port=Depends(get_currency_port),
     current_user: User = Depends(get_current_user),
@@ -62,7 +63,7 @@ def add_expense(
     try:
         output = use_case.execute(
             AddExpenseInput(
-                trip_id=trip_id,
+                trip_id=trip.id,
                 paid_by=current_user.id,
                 title=body.title,
                 amount=body.amount,
@@ -82,17 +83,10 @@ def add_expense(
 
 @router.get("/{trip_id}/expenses", response_model=list[ExpenseResponse])
 def list_expenses(
-    trip_id: int,
+    trip=Depends(require_trip_member),
     trip_repo=Depends(get_trip_repository),
-    _: User = Depends(get_current_user),
 ):
-    trip = trip_repo.get_trip(trip_id)
-    if trip is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Trip not found"
-        )
-
-    expenses = trip_repo.list_expenses(trip_id)
+    expenses = trip_repo.list_expenses(trip.id)
     return [
         _to_expense_response(expense, trip_repo.get_splits(expense.id))
         for expense in expenses

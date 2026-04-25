@@ -15,6 +15,9 @@ class TripRepository(ABC):
     def list_trips(self) -> list[Trip]: ...
 
     @abstractmethod
+    def list_trips_for_user(self, user_id: int) -> list[Trip]: ...
+
+    @abstractmethod
     def save_trip(self, trip: Trip) -> Trip: ...
 
     @abstractmethod

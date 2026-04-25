@@ -228,6 +228,167 @@ class TestTrips:
         resp = client.post("/trips", json={"name": "Tokyo", "base_currency": "EUR"})
         assert resp.status_code == 401
 
+    def test_should_return_403_when_user_is_not_a_member(self, client):
+        token_alice = _register_and_login(client, "alice@example.com")
+        token_bob = _register_and_login(client, "bob@example.com")
+
+        trip_id = client.post(
+            "/trips",
+            json={"name": "Alice Trip", "base_currency": "EUR"},
+            headers=_auth(token_alice),
+        ).json()["id"]
+
+        resp = client.get(f"/trips/{trip_id}", headers=_auth(token_bob))
+        assert resp.status_code == 403
+
+
+# ─── My Trips ─────────────────────────────────────────────────────────────────
+
+
+class TestMyTrips:
+    def test_should_return_empty_list_when_user_has_no_trips(self, client):
+        token = _register_and_login(client)
+        resp = client.get("/trips", headers=_auth(token))
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    def test_should_return_only_my_trips(self, client):
+        token_alice = _register_and_login(client, "alice@example.com")
+        token_bob = _register_and_login(client, "bob@example.com")
+
+        client.post(
+            "/trips",
+            json={"name": "Paris", "base_currency": "EUR"},
+            headers=_auth(token_alice),
+        )
+        client.post(
+            "/trips",
+            json={"name": "Tokyo", "base_currency": "JPY"},
+            headers=_auth(token_alice),
+        )
+        client.post(
+            "/trips",
+            json={"name": "NYC", "base_currency": "USD"},
+            headers=_auth(token_bob),
+        )
+
+        resp = client.get("/trips", headers=_auth(token_alice))
+        assert resp.status_code == 200
+        names = {t["name"] for t in resp.json()}
+        assert names == {"Paris", "Tokyo"}
+
+    def test_should_include_trip_when_added_as_member(self, client):
+        token_alice = _register_and_login(client, "alice@example.com")
+        token_bob = _register_and_login(client, "bob@example.com")
+        bob_id = client.get("/auth/me", headers=_auth(token_bob)).json()["id"]
+
+        trip = client.post(
+            "/trips",
+            json={"name": "Paris", "base_currency": "EUR"},
+            headers=_auth(token_alice),
+        ).json()
+        client.post(
+            f"/trips/{trip['id']}/members",
+            json={"user_id": bob_id},
+            headers=_auth(token_alice),
+        )
+
+        resp = client.get("/trips", headers=_auth(token_bob))
+        assert resp.status_code == 200
+        assert any(t["name"] == "Paris" for t in resp.json())
+
+    def test_should_return_401_when_not_authenticated(self, client):
+        resp = client.get("/trips")
+        assert resp.status_code == 401
+
+
+# ─── Members ──────────────────────────────────────────────────────────────────
+
+
+class TestMembers:
+    @pytest.fixture()
+    def setup(self, client):
+        token_alice = _register_and_login(client, "alice@example.com")
+        token_bob = _register_and_login(client, "bob@example.com")
+        trip = client.post(
+            "/trips",
+            json={"name": "Tokyo", "base_currency": "EUR"},
+            headers=_auth(token_alice),
+        ).json()
+        alice_id = client.get("/auth/me", headers=_auth(token_alice)).json()["id"]
+        bob_id = client.get("/auth/me", headers=_auth(token_bob)).json()["id"]
+        return {
+            "trip": trip,
+            "token_alice": token_alice,
+            "token_bob": token_bob,
+            "alice_id": alice_id,
+            "bob_id": bob_id,
+        }
+
+    def test_should_list_creator_as_member(self, client, setup):
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/members", headers=_auth(setup["token_alice"])
+        )
+        assert resp.status_code == 200
+        members = resp.json()
+        assert len(members) == 1
+        assert members[0]["user_id"] == setup["alice_id"]
+        assert members[0]["display_name"] == "Alice"
+        assert "role" in members[0]
+
+    def test_should_list_all_members_after_adding(self, client, setup):
+        client.post(
+            f"/trips/{setup['trip']['id']}/members",
+            json={"user_id": setup["bob_id"]},
+            headers=_auth(setup["token_alice"]),
+        )
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/members", headers=_auth(setup["token_alice"])
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+        user_ids = {m["user_id"] for m in resp.json()}
+        assert user_ids == {setup["alice_id"], setup["bob_id"]}
+
+    def test_should_return_404_when_adding_unknown_user(self, client, setup):
+        resp = client.post(
+            f"/trips/{setup['trip']['id']}/members",
+            json={"user_id": 9999},
+            headers=_auth(setup["token_alice"]),
+        )
+        assert resp.status_code == 404
+
+    def test_should_return_409_when_user_already_member(self, client, setup):
+        resp = client.post(
+            f"/trips/{setup['trip']['id']}/members",
+            json={"user_id": setup["alice_id"]},
+            headers=_auth(setup["token_alice"]),
+        )
+        assert resp.status_code == 409
+
+    def test_should_return_403_when_non_member_lists_members(self, client, setup):
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/members", headers=_auth(setup["token_bob"])
+        )
+        assert resp.status_code == 403
+
+    def test_should_allow_any_member_to_add_another(self, client, setup):
+        """Bob (once a member) can add a third user."""
+        token_charlie = _register_and_login(client, "charlie@example.com")
+        charlie_id = client.get("/auth/me", headers=_auth(token_charlie)).json()["id"]
+
+        client.post(
+            f"/trips/{setup['trip']['id']}/members",
+            json={"user_id": setup["bob_id"]},
+            headers=_auth(setup["token_alice"]),
+        )
+        resp = client.post(
+            f"/trips/{setup['trip']['id']}/members",
+            json={"user_id": charlie_id},
+            headers=_auth(setup["token_bob"]),
+        )
+        assert resp.status_code == 204
+
 
 # ─── Expenses ─────────────────────────────────────────────────────────────────
 
@@ -250,7 +411,7 @@ class TestExpenses:
         bob_id = client.get("/auth/me", headers=_auth(token_bob)).json()["id"]
         client.post(
             f"/trips/{trip['id']}/members",
-            params={"user_id": bob_id},
+            json={"user_id": bob_id},
             headers=_auth(token_alice),
         )
 
@@ -326,7 +487,7 @@ class TestExpenses:
             },
             headers=_auth(token),
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 404
 
     def test_should_apply_exchange_rate_when_currency_differs_from_base(self, client):
         """StubCurrencyPort returns 1.0, so amount_pivot == amount regardless of currency."""
@@ -373,7 +534,7 @@ class TestSettlements:
         bob_id = client.get("/auth/me", headers=_auth(token_bob)).json()["id"]
         client.post(
             f"/trips/{trip['id']}/members",
-            params={"user_id": bob_id},
+            json={"user_id": bob_id},
             headers=_auth(token_alice),
         )
 
@@ -479,3 +640,38 @@ class TestSettlements:
     def test_should_return_401_when_token_is_missing(self, client):
         resp = client.get("/trips/1/settlements")
         assert resp.status_code == 401
+
+    def test_should_return_pdf_with_expenses(self, client, setup):
+        client.post(
+            f"/trips/{setup['trip']['id']}/expenses",
+            json={
+                "title": "Dinner",
+                "amount": 100.0,
+                "currency": "EUR",
+                "split_type": "equal",
+            },
+            headers=_auth(setup["token_alice"]),
+        )
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/settlements/pdf",
+            headers=_auth(setup["token_alice"]),
+        )
+        assert resp.status_code == 200
+        assert "application/pdf" in resp.headers["content-type"]
+        assert resp.content[:4] == b"%PDF"
+
+    def test_should_return_pdf_when_no_expenses(self, client, setup):
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/settlements/pdf",
+            headers=_auth(setup["token_alice"]),
+        )
+        assert resp.status_code == 200
+        assert resp.content[:4] == b"%PDF"
+
+    def test_should_return_403_on_pdf_when_not_member(self, client, setup):
+        token_stranger = _register_and_login(client, "stranger@example.com")
+        resp = client.get(
+            f"/trips/{setup['trip']['id']}/settlements/pdf",
+            headers=_auth(token_stranger),
+        )
+        assert resp.status_code == 403

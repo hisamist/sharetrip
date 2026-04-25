@@ -57,6 +57,15 @@ class SQLTripRepository(TripRepository):
         rows = self._session.query(TripORM).all()
         return [self._trip_to_domain(r) for r in rows]
 
+    def list_trips_for_user(self, user_id: int) -> list[Trip]:
+        rows = (
+            self._session.query(TripORM)
+            .join(MembershipORM, MembershipORM.trip_id == TripORM.id)
+            .filter(MembershipORM.user_id == user_id)
+            .all()
+        )
+        return [self._trip_to_domain(r) for r in rows]
+
     def delete_trip(self, trip_id: int) -> None:
         row = self._session.get(TripORM, trip_id)
         if row is None:

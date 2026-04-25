@@ -38,6 +38,9 @@ class StubTripRepository(TripRepository):
     def list_trips(self) -> list[Trip]:
         return [self._trip] if self._trip else []
 
+    def list_trips_for_user(self, user_id: int) -> list[Trip]:
+        return [self._trip] if self._trip else []
+
     def save_trip(self, trip: Trip) -> Trip:
         self._trip = trip
         return trip
