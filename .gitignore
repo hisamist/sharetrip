@@ -9,6 +9,7 @@ env/
 # Tests & Coverage
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
 
 # IDE
