@@ -34,5 +34,20 @@ jobs:
         run: task lint
 
       - name: Run tests with coverage
-        # Cette commande échouera automatiquement si la couverture < 80%
-        run: task cov
+        # Génère coverage.xml pour SonarCloud + échoue si couverture < 80%
+        run: python -m pytest --cov=src --cov-report=xml --cov-fail-under=80
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Scan dependencies for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
