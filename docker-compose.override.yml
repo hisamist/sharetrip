@@ -1,0 +1,23 @@
+# Dev only — appliqué automatiquement par `docker compose up`
+services:
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src   # hot-reload du code source
+    environment:
+      APP_ENV: development
+    command: uvicorn sharetrip.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  db:
+    ports:
+      - "5432:5432"    # accès direct en dev
+    restart: unless-stopped
+
+  redis:
+    ports:
+      - "6379:6379"    # accès direct en dev
+    restart: unless-stopped

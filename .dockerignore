@@ -1,9 +1,37 @@
-.venv
-__pycache__
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__/
 *.pyc
 *.pyo
-.pytest_cache
-.ruff_cache
-*.egg-info
+.venv/
+venv/
+*.egg-info/
+
+# Tests & Coverage
 tests/
-docs/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Dev tools
+.ruff_cache/
+.pre-commit-config.yaml
+sonar-project.properties
+
+# Docs & IDE
+*.md
+.vscode/
+.idea/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Docker
+Dockerfile
+docker-compose*.yml

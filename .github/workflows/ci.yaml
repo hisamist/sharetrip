@@ -1,53 +1,138 @@
-name: CI  # Nom mis à jour
+name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
 
 jobs:
-  build:
+  # ═══════════════════════════════════════════════════════════════
+  # PARALLEL JOBS
+  # ═══════════════════════════════════════════════════════════════
+
+  lint:
+    name: Lint & Format
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"  # Accélère les exécutions suivantes
+          cache: pip
+      - run: pip install .[dev]
+      - run: python -m ruff format --check .
+      - run: task lint
 
-      - name: Upgrade build tools
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install .[dev]
+      - run: python -m pytest tests/unit/ tests/integration/ --cov=src --cov-report=xml --cov-fail-under=80
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
 
-      - name: Install dependencies
-        run: |
-          pip install .[dev]
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install .[dev]
+      - run: python -m pytest tests/integration/
 
-      - name: Check formatting
-        run: python -m ruff format --check .
+  security-deps:
+    name: Scan Dependencies (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
 
-      - name: Run linter
-        run: task lint
+  # ═══════════════════════════════════════════════════════════════
+  # SEQUENTIAL JOBS
+  # ═══════════════════════════════════════════════════════════════
 
-      - name: Run tests with coverage
-        # Génère coverage.xml pour SonarCloud + échoue si couverture < 80%
-        run: python -m pytest --cov=src --cov-report=xml --cov-fail-under=80
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+  sonarcloud:
+    name: SonarCloud Analysis
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+      - uses: SonarSource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      - name: Scan dependencies for vulnerabilities (Trivy)
-        uses: aquasecurity/trivy-action@master
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests, integration-tests]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          scan-type: fs
-          scan-ref: .
+          python-version: "3.11"
+          cache: pip
+      - run: pip install .
+      - run: python -c "from sharetrip.main import app; print('Build OK')"
+
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image with layer cache
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: sharetrip:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: true
+      - name: Save image as artifact
+        run: docker save sharetrip:ci -o sharetrip.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: sharetrip.tar
+
+  security-image:
+    name: Scan Docker Image (Trivy)
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+      - run: docker load -i sharetrip.tar
+      - uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: image
+          image-ref: sharetrip:ci
           severity: CRITICAL,HIGH
           exit-code: 1
           ignore-unfixed: true
