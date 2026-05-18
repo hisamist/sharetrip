@@ -62,7 +62,7 @@ def test_upgrade_is_idempotent():
     """Running upgrade head twice must not raise."""
     for i in range(2):
         result = _run_alembic("upgrade", "head")
-        assert (
-            result.returncode == 0
-        ), f"alembic upgrade head (run {i + 1}) failed:\n{result.stderr}"
+        assert result.returncode == 0, (
+            f"alembic upgrade head (run {i + 1}) failed:\n{result.stderr}"
+        )
     assert EXPECTED_TABLES.issubset(_get_tables())
