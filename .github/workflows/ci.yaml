@@ -39,8 +39,8 @@ jobs:
           cache: pip
       - run: pip install .[dev]
       - run: >
-          python -m pytest tests/unit/
-          --cov-fail-under=70
+          python -m pytest tests/unit/ tests/integration/
+          --cov=src --cov-report=xml --cov-fail-under=70
       - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
