@@ -273,75 +273,140 @@ sonarcloud ← needs: unit-tests
 
 ## IaC — Infrastructure as Code
 
-### Terraform — Provisionnement (Docker provider)
+ShareTrip utilise une approche IaC à deux niveaux avec une séparation claire des responsabilités :
 
-**Prérequis :** Terraform ≥ 1.6 + Docker Desktop
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Remplir postgres_password et jwt_secret_key dans terraform.tfvars
-
-terraform init
-terraform plan -var-file=terraform.tfvars   # Preview
-terraform apply -var-file=terraform.tfvars  # Créer l'infra
-terraform destroy -var-file=terraform.tfvars # Supprimer
-```
-
-| Ressource | Description |
-|-----------|-------------|
-| `docker_network` | Réseau isolé `sharetrip_production` |
-| `docker_volume` × 2 | Persistance PostgreSQL + Redis |
-| `docker_container` postgres | PostgreSQL 16 avec healthcheck `pg_isready` |
-| `docker_container` redis | Redis 7 avec AOF persistence |
-| `docker_container` app | API ShareTrip avec toutes les env vars câblées |
-
-**Structure :**
-```
-terraform/
-├── providers.tf          # kreuzwerker/docker ~> 3.0, backend local
-├── variables.tf          # Variables (secrets sans default → enforced)
-├── main.tf               # Appel du module
-├── outputs.tf            # app_url, api_docs_url, noms des conteneurs
-├── terraform.tfvars.example
-└── modules/sharetrip-stack/
-    ├── main.tf           # Toutes les ressources Docker
-    ├── variables.tf
-    └── outputs.tf
-```
-
-**State :** local (`terraform.tfstate`) — pour un déploiement réel, migrer vers un backend remote :
-```hcl
-backend "s3" { bucket = "..." key = "sharetrip/terraform.tfstate" }
-```
-
-**CI :** `terraform plan` s'exécute automatiquement sur chaque PR pour prévisualiser les changements avant merge.
+| Outil | Rôle | Cible |
+|-------|------|-------|
+| **Terraform** | Provisionnement — *quoi* créer | Réseau, conteneurs, volumes Docker |
+| **Ansible** | Configuration & déploiement — *comment* configurer | Serveur cible (localhost ou SSH) |
 
 ---
 
-### Ansible — Configuration & Déploiement
+### ⚙ Terraform — Provisionnement d'infrastructure
 
-**Prérequis :** `pip install ansible` (Linux/Mac/WSL)
+> Provider : `kreuzwerker/docker ~> 3.0` — aucun compte cloud requis, démontre le workflow Terraform complet en local.
+
+**Prérequis :** [Terraform ≥ 1.6](https://developer.hashicorp.com/terraform/install) + Docker Desktop
+
+```bash
+cd terraform
+
+# 1. Configurer les secrets
+cp terraform.tfvars.example terraform.tfvars
+# Éditer terraform.tfvars → renseigner postgres_password et jwt_secret_key
+
+# 2. Télécharger le provider Docker (~10 MB)
+terraform init
+
+# 3. Prévisualiser les changements (aucune modification)
+terraform plan -var-file=terraform.tfvars
+
+# 4. Créer l'infrastructure
+terraform apply -var-file=terraform.tfvars
+
+# 5. Accéder à l'API
+open http://localhost:8000/docs
+
+# Teardown complet
+terraform destroy -var-file=terraform.tfvars
+```
+
+**Ressources provisionnées :**
+
+| Ressource | Nom | Description |
+|-----------|-----|-------------|
+| `docker_network` | `sharetrip_production` | Réseau isolé entre les conteneurs |
+| `docker_volume` | `sharetrip_production_postgres_data` | Persistance PostgreSQL |
+| `docker_volume` | `sharetrip_production_redis_data` | Persistance Redis (AOF) |
+| `docker_container` | `sharetrip_production_postgres` | PostgreSQL 16-alpine + healthcheck `pg_isready` |
+| `docker_container` | `sharetrip_production_redis` | Redis 7-alpine + `--appendonly yes` |
+| `docker_container` | `sharetrip_production_app` | API ShareTrip, env vars câblées, `depends_on` postgres + redis |
+
+**Structure du module :**
+```
+terraform/
+├── providers.tf              # Provider kreuzwerker/docker, backend local documenté
+├── variables.tf              # Variables racine (postgres_password, jwt_secret_key sans default → enforced)
+├── main.tf                   # Appel du module sharetrip-stack
+├── outputs.tf                # app_url, api_docs_url, noms des conteneurs
+├── terraform.tfvars.example  # Template — ne jamais committer terraform.tfvars
+└── modules/
+    └── sharetrip-stack/      # Module réutilisable encapsulant la stack complète
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
+```
+
+**Gestion du state :**
+
+Le state est stocké localement (`terraform.tfstate`, exclu du git). Pour un déploiement en équipe, migrer vers un backend remote :
+```hcl
+# Option 1 — AWS S3 + DynamoDB (lock)
+backend "s3" {
+  bucket         = "sharetrip-tfstate"
+  key            = "prod/terraform.tfstate"
+  region         = "eu-west-1"
+  dynamodb_table = "sharetrip-tf-lock"
+}
+
+# Option 2 — Terraform Cloud (gratuit jusqu'à 5 utilisateurs)
+backend "remote" {
+  organization = "sharetrip"
+  workspaces { name = "production" }
+}
+```
+
+**Intégration CI :** `terraform plan` s'exécute automatiquement sur chaque PR (`if: github.event_name == 'pull_request'`), affichant un preview des changements d'infrastructure dans les checks GitHub avant tout merge.
+
+---
+
+### ⚙ Ansible — Configuration & Déploiement
+
+> Inventaire : `localhost` (connection: local) pour les tests — adaptable à n'importe quel serveur distant en modifiant `ansible_host`.
+
+**Prérequis :** `pip install ansible` (Linux / Mac / WSL)
 
 ```bash
 cd ansible
 
-# Déploiement complet (idempotent)
+# Déploiement complet — installe Docker, démarre les services, migre la BDD
 ansible-playbook playbooks/deploy.yml
 
-# Dry-run — aucune modification appliquée
+# Dry-run — simule sans appliquer de changement
 ansible-playbook playbooks/deploy.yml --check
+
+# Vérifier la syntaxe uniquement
+ansible-playbook playbooks/deploy.yml --syntax-check
+
+# Rejouer en production — idempotent, rien ne casse
+ansible-playbook playbooks/deploy.yml
 ```
 
-| Rôle | Responsabilité |
-|------|----------------|
-| `common` | Installe Docker et ses dépendances sur le serveur cible |
-| `sharetrip` | Crée `/opt/sharetrip`, template `.env` (Jinja2), démarre les conteneurs, exécute `alembic upgrade head` |
-| `nginx` | Configure le reverse proxy (port 80 → 8000) avec suppression des logs `/health` |
+**Roles et responsabilités :**
 
-**Inventaire :** `localhost` (connection: local) pour les tests — changer `ansible_host` pour un serveur distant.
+| Rôle | Tâches clés | Idempotence |
+|------|-------------|-------------|
+| `common` | Installe Docker CE, démarre le daemon, crée l'utilisateur `sharetrip` | `state: present/started` — sans effet si déjà installé |
+| `sharetrip` | Crée `/opt/sharetrip`, template `.env` via Jinja2, pull l'image, démarre postgres → redis → app, exécute `alembic upgrade head` | Conteneurs `state: started`, handler `restart app` déclenché uniquement si `.env` change |
+| `nginx` | Installe nginx, déploie la config reverse proxy (port 80 → 8000), valide avec `nginx -t` | `state: present`, `systemctl reload` gracieux |
 
-**Idempotence :** relancer le playbook ne casse rien — les tâches utilisent `state: started/present` et les handlers ne se déclenchent que si `.env` a changé.
+**Template Jinja2 (`.env.j2`) :**
+```jinja
+DATABASE_URL=postgresql://{{ postgres_user }}:{{ postgres_password }}@sharetrip_postgres:5432/{{ postgres_db }}
+REDIS_URL=redis://sharetrip_redis:6379/0
+JWT_SECRET_KEY={{ jwt_secret_key }}
+APP_ENV={{ app_env }}
+```
+Les secrets sont définis dans `roles/sharetrip/defaults/main.yml` et peuvent être surchargés via `ansible-vault` pour la production.
+
+**Flux d'exécution du playbook :**
+```
+[common]  → installe Docker
+    ↓
+[sharetrip] → génère .env → pull image → postgres → redis → app → migrations
+    ↓
+[nginx]   → configure reverse proxy → reload
+```
 
 ---
 
