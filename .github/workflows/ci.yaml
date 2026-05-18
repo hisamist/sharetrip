@@ -51,8 +51,8 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_USER: sharetrip
+          POSTGRES_PASSWORD: sharetrip_ci
           POSTGRES_DB: sharetrip_test
         ports:
           - 5432:5432
@@ -70,7 +70,7 @@ jobs:
       - run: pip install .[dev]
       - run: python -m pytest tests/integration/test_real_db.py -v
         env:
-          DATABASE_URL: postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/sharetrip_test
+          DATABASE_URL: postgresql://sharetrip:sharetrip_ci@localhost:5432/sharetrip_test
 
   security-deps:
     name: Scan Dependencies (Trivy)
