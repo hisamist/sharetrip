@@ -14,7 +14,7 @@ dependencies = [
     "psycopg2-binary",
     "bcrypt",
     "pyjwt",
-    "pydantic[email]>=2.13.3",
+    "pydantic[email]>=2.13.4",
     "fpdf2",
     "slowapi",
 ]
