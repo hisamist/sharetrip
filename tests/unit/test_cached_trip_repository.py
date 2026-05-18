@@ -1,4 +1,5 @@
 import pytest
+
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.entities.membership import Membership
 from sharetrip.domain.entities.trip import Trip

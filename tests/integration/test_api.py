@@ -6,6 +6,10 @@ No external services required.
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
 from sharetrip.api.dependencies import (
     get_currency_port,
     get_db_session,
@@ -14,9 +18,6 @@ from sharetrip.api.dependencies import (
 from sharetrip.domain.interfaces.currency_port import CurrencyPort
 from sharetrip.infrastructure.db.models import Base
 from sharetrip.main import app
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 # ─── Fakes ────────────────────────────────────────────────────────────────────
 

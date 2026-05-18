@@ -1,4 +1,5 @@
 import pytest
+
 from sharetrip.domain.entities.user import User
 from sharetrip.domain.interfaces.user_repository import UserRepository
 from sharetrip.infrastructure.auth.jwt_service import JWTService
