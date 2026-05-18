@@ -1,0 +1,100 @@
+---
+- name: Create application directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: "{{ app_user | default('sharetrip') }}"
+    group: "{{ app_user | default('sharetrip') }}"
+    mode: "0755"
+
+- name: Template .env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: "{{ app_user | default('sharetrip') }}"
+    group: "{{ app_user | default('sharetrip') }}"
+    mode: "0600"
+  notify: restart app
+
+- name: Pull application Docker image
+  community.docker.docker_image:
+    name: "{{ app_image }}"
+    source: pull
+    state: present
+
+- name: Create Docker network for ShareTrip
+  community.docker.docker_network:
+    name: sharetrip_network
+    state: present
+
+- name: Start PostgreSQL container
+  community.docker.docker_container:
+    name: sharetrip_postgres
+    image: postgres:16-alpine
+    state: started
+    restart_policy: unless-stopped
+    env:
+      POSTGRES_USER: "{{ postgres_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_password }}"
+      POSTGRES_DB: "{{ postgres_db }}"
+    volumes:
+      - sharetrip_postgres_data:/var/lib/postgresql/data
+    networks:
+      - name: sharetrip_network
+
+- name: Wait for PostgreSQL to be healthy
+  ansible.builtin.shell: |
+    {% raw %}
+    docker inspect --format='{{json .State.Health.Status}}' sharetrip_postgres | grep -q "healthy" || \
+    {% endraw %}
+    docker exec sharetrip_postgres pg_isready -U {{ postgres_user }} -d {{ postgres_db }}
+  register: result
+  until: result.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: false
+
+- name: Start Redis container
+  community.docker.docker_container:
+    name: sharetrip_redis
+    image: redis:7-alpine
+    state: started
+    restart_policy: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - sharetrip_redis_data:/data
+    networks:
+      - name: sharetrip_network
+
+- name: Start ShareTrip application container
+  community.docker.docker_container:
+    name: sharetrip_app
+    image: "{{ app_image }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file: "{{ app_dir }}/.env"
+    working_dir: "/app"
+    user: "0:0"
+    env:
+      PYTHONPATH: "/app:/app/src"
+    healthcheck:
+      test: ["NONE"]
+    command: ["/app/.venv/bin/uvicorn", "src.sharetrip.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    networks:
+      - name: sharetrip_network
+    links:
+      - sharetrip_postgres:postgres
+      - sharetrip_redis:redis
+
+- name: Run Alembic database migrations
+  ansible.builtin.command: >
+    docker run --rm
+    --network sharetrip_network
+    --link sharetrip_postgres:postgres
+    --env-file /opt/sharetrip/.env
+    -e PYTHONPATH=/app/src
+    --workdir /app
+    ghcr.io/hisamist/sharetrip:latest
+    python -m alembic upgrade head

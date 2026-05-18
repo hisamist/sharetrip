@@ -1,0 +1,3 @@
+---
+nginx_server_name: localhost
+app_upstream: "localhost:{{ app_port | default(8000) }}"

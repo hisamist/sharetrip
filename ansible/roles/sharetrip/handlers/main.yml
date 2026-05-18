@@ -1,0 +1,6 @@
+---
+- name: restart app
+  community.docker.docker_container:
+    name: sharetrip_app
+    state: started
+    restart: true

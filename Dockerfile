@@ -43,6 +43,8 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy the application source code and set ownership to the non-root user
 COPY --chown=appuser:appgroup src/ ./src/
+COPY --chown=appuser:appgroup alembic/ ./alembic/
+COPY --chown=appuser:appgroup alembic.ini ./
 
 # OPTIMIZATION: Manually remove unnecessary files to further reduce image weight
 RUN find /app/.venv -depth \
@@ -63,4 +65,4 @@ HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
 
 # Start the application using Uvicorn
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.sharetrip.main:app", "--host", "0.0.0.0", "--port", "8000"]

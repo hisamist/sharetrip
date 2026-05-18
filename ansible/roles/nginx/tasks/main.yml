@@ -1,0 +1,39 @@
+---
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+
+- name: Template nginx site configuration
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/sharetrip
+    owner: root
+    group: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Enable ShareTrip nginx site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/sharetrip
+    dest: /etc/nginx/sites-enabled/sharetrip
+    state: link
+  notify: reload nginx
+
+- name: Disable default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Validate nginx configuration
+  ansible.builtin.command:
+    cmd: nginx -t
+  changed_when: false
+
+- name: Start and enable nginx service
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
