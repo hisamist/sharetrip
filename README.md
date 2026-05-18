@@ -34,6 +34,7 @@ Construit avec **FastAPI**, **PostgreSQL**, **Redis** — architecture **Clean A
 - [Qualité de code](#qualité-de-code)
 - [Docker](#docker)
 - [CI/CD Pipeline](#cicd-pipeline)
+- [IaC — Infrastructure as Code](#iac--infrastructure-as-code)
 - [Choix justifiés](#choix-justifiés)
 
 ---
@@ -270,6 +271,80 @@ sonarcloud ← needs: unit-tests
 
 ---
 
+## IaC — Infrastructure as Code
+
+### Terraform — Provisionnement (Docker provider)
+
+**Prérequis :** Terraform ≥ 1.6 + Docker Desktop
+
+```bash
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Remplir postgres_password et jwt_secret_key dans terraform.tfvars
+
+terraform init
+terraform plan -var-file=terraform.tfvars   # Preview
+terraform apply -var-file=terraform.tfvars  # Créer l'infra
+terraform destroy -var-file=terraform.tfvars # Supprimer
+```
+
+| Ressource | Description |
+|-----------|-------------|
+| `docker_network` | Réseau isolé `sharetrip_production` |
+| `docker_volume` × 2 | Persistance PostgreSQL + Redis |
+| `docker_container` postgres | PostgreSQL 16 avec healthcheck `pg_isready` |
+| `docker_container` redis | Redis 7 avec AOF persistence |
+| `docker_container` app | API ShareTrip avec toutes les env vars câblées |
+
+**Structure :**
+```
+terraform/
+├── providers.tf          # kreuzwerker/docker ~> 3.0, backend local
+├── variables.tf          # Variables (secrets sans default → enforced)
+├── main.tf               # Appel du module
+├── outputs.tf            # app_url, api_docs_url, noms des conteneurs
+├── terraform.tfvars.example
+└── modules/sharetrip-stack/
+    ├── main.tf           # Toutes les ressources Docker
+    ├── variables.tf
+    └── outputs.tf
+```
+
+**State :** local (`terraform.tfstate`) — pour un déploiement réel, migrer vers un backend remote :
+```hcl
+backend "s3" { bucket = "..." key = "sharetrip/terraform.tfstate" }
+```
+
+**CI :** `terraform plan` s'exécute automatiquement sur chaque PR pour prévisualiser les changements avant merge.
+
+---
+
+### Ansible — Configuration & Déploiement
+
+**Prérequis :** `pip install ansible` (Linux/Mac/WSL)
+
+```bash
+cd ansible
+
+# Déploiement complet (idempotent)
+ansible-playbook playbooks/deploy.yml
+
+# Dry-run — aucune modification appliquée
+ansible-playbook playbooks/deploy.yml --check
+```
+
+| Rôle | Responsabilité |
+|------|----------------|
+| `common` | Installe Docker et ses dépendances sur le serveur cible |
+| `sharetrip` | Crée `/opt/sharetrip`, template `.env` (Jinja2), démarre les conteneurs, exécute `alembic upgrade head` |
+| `nginx` | Configure le reverse proxy (port 80 → 8000) avec suppression des logs `/health` |
+
+**Inventaire :** `localhost` (connection: local) pour les tests — changer `ansible_host` pour un serveur distant.
+
+**Idempotence :** relancer le playbook ne casse rien — les tâches utilisent `state: started/present` et les handlers ne se déclenchent que si `.env` a changé.
+
+---
+
 ## Choix justifiés
 
 **Pourquoi Clean Architecture ?**
@@ -311,8 +386,11 @@ Le pipeline `.github/workflows/ci.yaml` a été conçu selon une approche de val
 * **Qualité de code (SonarCloud Gate) :**
   Le job `sonarcloud` dépend de la réussite de `unit-tests` et récupère l'artéfact `coverage.xml`. *Justification :* Cela évite de consommer des crédits d'analyse SonarCloud si la couverture minimale requise de 70% n'est pas atteinte localement, assurant une gouvernance stricte de la qualité du code avant d'autoriser la mise en production.
 
-**IaC — non implémenté**
-Terraform/Ansible nécessitent un provider cloud configuré (AWS, GCP...). Sans environnement cloud disponible pour ce projet, l'IaC n'a pas été implémentée. Les fichiers Docker Compose `docker-compose.prod.yml` remplissent le rôle d'infrastructure déclarative pour le déploiement local/VM.
+**Pourquoi Terraform + Docker provider (sans cloud) ?**
+Le provider `kreuzwerker/docker` permet de démontrer le workflow Terraform complet (init → plan → apply → destroy) sans nécessiter de compte cloud. L'infrastructure est déclarée en code, versionnée, et reproductible. Un `terraform plan` s'exécute automatiquement sur chaque PR pour prévisualiser les changements d'infrastructure avant merge.
+
+**Pourquoi Ansible en complément de Terraform ?**
+Terraform provisionne les ressources (conteneurs, réseau, volumes). Ansible configure le serveur cible et déploie l'application : installation de Docker, génération du `.env` via Jinja2, démarrage des conteneurs, exécution des migrations Alembic. La séparation est claire — Terraform gère le *quoi*, Ansible gère le *comment*.
 
 **Monitoring — partiellement implémenté**
 - Health check endpoint : `GET /health` ✅
@@ -327,8 +405,15 @@ Terraform/Ansible nécessitent un provider cloud configuré (AWS, GCP...). Sans 
 ```
 sharetrip/
 ├── src/sharetrip/          # Code source
-├── tests/                  # 158 tests (unit + integration)
+├── tests/                  # Tests (unit + integration + migrations)
 ├── .github/workflows/      # CI + CD pipelines
+├── terraform/              # IaC — provisionnement Docker
+│   ├── modules/sharetrip-stack/
+│   └── terraform.tfvars.example
+├── ansible/                # IaC — configuration & déploiement
+│   ├── inventory/
+│   ├── playbooks/
+│   └── roles/              # common, sharetrip, nginx
 ├── Dockerfile              # Multi-stage Alpine build
 ├── docker-compose.yml      # Base (dev + prod)
 ├── docker-compose.override.yml  # Dev (hot-reload)

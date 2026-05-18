@@ -1,0 +1,11 @@
+---
+app_dir: /opt/sharetrip
+app_image: ghcr.io/hisamist/sharetrip:latest
+app_port: 8000
+postgres_user: sharetrip
+
+postgres_password: "sharetrip_db_pass_123"
+postgres_db: sharetrip
+jwt_secret_key: "super_secret_jwt_key_for_sharetrip_app_2026"
+
+app_env: production
