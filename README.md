@@ -88,7 +88,7 @@ HTTP Request → FastAPI Router → Use Case → Domain → Repository → Postg
 ## Design Patterns
 
 ### 1. Repository Pattern
-**Pourquoi :** Découpler la logique métier de la base de données. Les use cases dépendent d'une interface abstraite `TripRepository`, pas de SQLAlchemy.  
+**Pourquoi :** Découpler la logique métier de la base de données. Les use cases dépendent d'une interface abstraite `TripRepository`, pas de SQLAlchemy.
 **Bénéfice :** Les tests utilisent SQLite in-memory sans changer une ligne de code métier.
 
 ```python
@@ -168,7 +168,7 @@ python -m pytest --cov=src --cov-report=html
 
 **Couverture :** > 80% — seuil CI : ≥ 70%
 
-**Pourquoi SQLite en tests ?**  
+**Pourquoi SQLite en tests ?**
 Isolation, rapidité, zéro infrastructure. Les tests d'intégration testent la vraie chaîne HTTP→UseCase→Repository. SQLite est suffisant car `SQLTripRepository` abstrait le dialecte SQL.
 
 ---
@@ -263,28 +263,52 @@ sonarcloud ← needs: unit-tests
 
 ## Choix justifiés
 
-**Pourquoi Clean Architecture ?**  
+**Pourquoi Clean Architecture ?**
 Le domaine métier (calcul de répartition, gestion des membres) ne doit pas dépendre de FastAPI ou SQLAlchemy. Si on change d'ORM ou de framework, seule la couche infrastructure change.
 
-**Pourquoi l'algorithme minimize-transfers pour les settlements ?**  
+**Pourquoi l'algorithme minimize-transfers pour les settlements ?**
 Avec N membres, une approche naïve génère O(N²) transferts. L'algorithme greedy sur créditeurs/débiteurs minimise le nombre de virements, réduisant la friction pour les utilisateurs.
 
-**Pourquoi Redis pour le cache ?**  
+**Pourquoi Redis pour le cache ?**
 Les taux de change (TTL 24h) et les membres d'un trip (TTL 5min) sont lus fréquemment et changent rarement. Le cache évite des appels DB et API répétés sans impacter la cohérence.
 
-**Pourquoi 70% comme seuil de couverture ?**  
+**Pourquoi 70% comme seuil de couverture ?**
 La couverture 100% est coûteuse et souvent inutile (getters, constructeurs). 70% couvre la logique métier critique (strategies, use cases) tout en restant atteignable. Notre couverture réelle est > 80%.
 
-**Pourquoi uv dans le Dockerfile ?**  
+**Pourquoi uv dans le Dockerfile ?**
 `uv` est 10-100x plus rapide que `pip` pour la résolution et l'installation des dépendances. Le `uv.lock` garantit des builds reproductibles.
 
-**IaC — non implémenté**  
+
+## Pipeline CI/CD (GitHub Actions)
+
+Le pipeline `.github/workflows/ci.yaml` a été conçu selon une approche de validation progressive (Fail-Fast) et sécurisée, structurée en jobs parallèles puis séquentiels.
+
+* **Stratégie de parallélisation (Lint, Tests, Sécurité) :**
+  Les étapes de Lint (`ruff`), de tests unitaires, de tests d'intégration (SQLite et PostgreSQL) et de scan de vulnérabilités du système de fichiers (`Trivy fs`) s'exécutent en parallèle. *Justification :* Cela permet de minimiser le temps de retour (feedback loop) pour le développeur. Si le code est mal formaté ou contient une faille, le pipeline échoue immédiatement sans attendre la fin des tests de base de données.
+
+* **Double niveau de tests d'intégration (SQLite et PostgreSQL) :**
+  Le pipeline sépare les tests d'intégration rapides via SQLite in-memory, et les tests de production via un conteneur de service PostgreSQL (`postgres:16-alpine`) éphémère. *Justification :* Les tests SQLite valident instantanément la logique globale des cas d'utilisation, tandis que le job `integration-tests-db` garantit la stricte compatibilité des requêtes SQL et du comportement des transactions avec le vrai moteur de base de données de production.
+
+* **Optimisation agressive du Cache (Pip et Docker Layers) :**
+  - **Python (`cache: pip`) :** Utilisation de l'intégration native de `actions/setup-python@v5` pour mettre en cache le répertoire de téléchargement de `pip`.
+  - **Docker (`cache-from/to: type=gha`) :** Le job `docker-build` utilise le cache natif de GitHub Actions pour conserver les couches (layers) inchangées du Dockerfile.
+  *Justification :* Cela évite de télécharger à nouveau les paquets Python et de recompiler les étapes de l'image Docker à chaque commit, réduisant la durée globale du pipeline de plus de 5 minutes à moins de 1 minute 30.
+
+* **Sécurité en deux étapes (Scan Trivy FS vs Image) :**
+  - **`security-deps` (Avant build) :** Analyse le code source et le fichier de verrouillage des dépendances.
+  - **`security-image` (Après build) :** Scanne l'image Docker finale finale poussée sur GHCR (`ghcr.io`).
+  *Justification :* Cette approche garantit qu'aucune vulnérabilité (`CRITICAL` ou `HIGH`) n'est introduite par nos bibliothèques Python tierces, ni par les paquets système OS (Alpine) inclus dans l'image finale. L'argument `exit-code: 1` bloque strictement le déploiement en cas de détection.
+
+* **Qualité de code (SonarCloud Gate) :**
+  Le job `sonarcloud` dépend de la réussite de `unit-tests` et récupère l'artéfact `coverage.xml`. *Justification :* Cela évite de consommer des crédits d'analyse SonarCloud si la couverture minimale requise de 70% n'est pas atteinte localement, assurant une gouvernance stricte de la qualité du code avant d'autoriser la mise en production.
+
+**IaC — non implémenté**
 Terraform/Ansible nécessitent un provider cloud configuré (AWS, GCP...). Sans environnement cloud disponible pour ce projet, l'IaC n'a pas été implémentée. Les fichiers Docker Compose `docker-compose.prod.yml` remplissent le rôle d'infrastructure déclarative pour le déploiement local/VM.
 
-**Monitoring — partiellement implémenté**  
-- Health check endpoint : `GET /health` ✅  
-- HEALTHCHECK Docker : `wget /health` toutes les 30s ✅  
-- Logs structurés JSON : non implémentés (amélioration future)  
+**Monitoring — partiellement implémenté**
+- Health check endpoint : `GET /health` ✅
+- HEALTHCHECK Docker : `wget /health` toutes les 30s ✅
+- Logs structurés JSON : non implémentés (amélioration future)
 - Dashboard Grafana/Prometheus : non implémentés
 
 ---
