@@ -84,6 +84,25 @@ jobs:
           exit-code: 1
           ignore-unfixed: true
 
+  terraform-plan:
+    name: Terraform Plan (Preview)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+      - name: Terraform Init
+        run: terraform init
+        working-directory: terraform
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: terraform
+      - name: Terraform Plan
+        run: terraform plan -var="postgres_password=ci_preview" -var="jwt_secret_key=ci_preview_key_minimum_32_chars"
+        working-directory: terraform
+
   # ═══════════════════════════════════════════════════════════════
   # SEQUENTIAL JOBS
   # ═══════════════════════════════════════════════════════════════
