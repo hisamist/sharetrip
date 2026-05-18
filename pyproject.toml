@@ -23,7 +23,7 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-cov",
-    "ruff==0.15.13",
+    "ruff",
     "taskipy",
     "httpx",
     "pre-commit",

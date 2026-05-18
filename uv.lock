@@ -960,7 +960,7 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "redis" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.15.13" },
+    { name = "ruff", marker = "extra == 'dev'" },
     { name = "slowapi" },
     { name = "sqlalchemy" },
     { name = "taskipy", marker = "extra == 'dev'" },

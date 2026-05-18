@@ -24,9 +24,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install .[dev]
-      - run: python -m ruff format --check .
-      - run: task lint
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files
 
   unit-tests:
     name: Unit Tests
