@@ -164,12 +164,21 @@ python -m pytest --cov=src --cov-report=html
 | Type | Fichiers | Description |
 |------|----------|-------------|
 | Unitaires | `tests/unit/` | Logique métier isolée, stubs pour dépendances |
-| Intégration | `tests/integration/` | Routes HTTP + SQLite in-memory + FakeRedis |
+| Intégration HTTP | `tests/integration/test_api.py` | Routes HTTP + SQLite in-memory + FakeRedis |
+| Intégration Repository | `tests/integration/test_sql_trip_repository.py` | CRUD SQLite in-memory |
+| Migrations PostgreSQL | `tests/integration/test_real_db.py` | Smoke test Alembic sur vrai PostgreSQL |
 
 **Couverture :** > 80% — seuil CI : ≥ 70%
 
-**Pourquoi SQLite en tests ?**
-Isolation, rapidité, zéro infrastructure. Les tests d'intégration testent la vraie chaîne HTTP→UseCase→Repository. SQLite est suffisant car `SQLTripRepository` abstrait le dialecte SQL.
+### Justification : Pourquoi utiliser à la fois SQLite et PostgreSQL en CI ?
+
+Le pipeline utilise une stratégie de test à double niveau (SQLite et PostgreSQL) exécutée en parallèle pour optimiser les ressources et le temps de retour (feedback loop) :
+
+1. **Job `unit-tests` (SQLite in-memory) — Objectif : Vitesse.**
+   Ce job s'exécute instantanément (sans latence d'infrastructure). Il sert de premier filtre "Fail-Fast" pour détecter immédiatement les régressions purement logicielles et algorithmiques (ex : calcul des répartitions de dépenses, logique d'authentification).
+
+2. **Job `integration-tests-db` (PostgreSQL Service) — Objectif : Fidélité Production.**
+   Ce job attend l'initialisation d'un vrai conteneur PostgreSQL. Il sert à valider ce que SQLite ne peut pas voir : la validité des scripts de migration Alembic (`upgrade head` / `downgrade base`), la stricte conformité des types SQL (contraintes, clés étrangères) et l'intégrité opérationnelle de la chaîne globale avant l'envoi de l'image Docker sur GHCR.
 
 ---
 
@@ -240,10 +249,10 @@ sonarcloud ← needs: unit-tests
 | Job | Description |
 |-----|-------------|
 | `lint` | ruff format + ruff check |
-| `unit-tests` | 158 tests, coverage ≥ 70%, artifact XML |
-| `integration-tests` | Routes HTTP, SQLite in-memory |
-| `security-deps` | Trivy scan filesystem |
-| `sonarcloud` | Quality Gate bloquante |
+| `unit-tests` | Tests unitaires + intégration HTTP (SQLite), coverage ≥ 70%, artifact XML |
+| `integration-tests-db` | Smoke test migrations Alembic sur PostgreSQL 16 éphémère |
+| `security-deps` | Trivy scan filesystem (CRITICAL/HIGH → fail) |
+| `sonarcloud` | Quality Gate bloquante (needs: unit-tests) |
 | `build` | Vérification imports Python |
 | `docker-build` | Build + push GHCR avec tag SHA |
 | `security-image` | Trivy scan image Docker depuis GHCR |
