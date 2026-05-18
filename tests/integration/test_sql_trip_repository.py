@@ -1,11 +1,12 @@
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
 from sharetrip.domain.entities.expense import Expense, ExpenseSplit, SplitType
 from sharetrip.domain.entities.membership import MemberRole, Membership
 from sharetrip.domain.entities.trip import RoundingStrategy, SettlementMethod, Trip
 from sharetrip.infrastructure.db.models import Base
 from sharetrip.infrastructure.db.sql_trip_repository import SQLTripRepository
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 
 
 @pytest.fixture(scope="function")

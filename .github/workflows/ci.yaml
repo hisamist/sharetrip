@@ -24,9 +24,8 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-      - run: pip install .[dev]
-      - run: python -m ruff format --check .
-      - run: task lint
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files
 
   unit-tests:
     name: Unit Tests
@@ -44,9 +43,23 @@ jobs:
           name: coverage-report
           path: coverage.xml
 
-  integration-tests:
-    name: Integration Tests
+  integration-tests-db:
+    name: Integration Tests (PostgreSQL)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sharetrip
+          POSTGRES_PASSWORD: sharetrip_ci
+          POSTGRES_DB: sharetrip_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,7 +67,9 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install .[dev]
-      - run: python -m pytest tests/integration/ -x --no-cov
+      - run: python -m pytest tests/integration/test_real_db.py -v
+        env:
+          DATABASE_URL: postgresql://sharetrip:sharetrip_ci@localhost:5432/sharetrip_test
 
   security-deps:
     name: Scan Dependencies (Trivy)
@@ -92,7 +107,7 @@ jobs:
   build:
     name: Build Application
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests, integration-tests]
+    needs: [lint, unit-tests, integration-tests-db]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

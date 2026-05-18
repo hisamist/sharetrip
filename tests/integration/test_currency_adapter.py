@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from sharetrip.infrastructure.adapters.currency_adapter import (
     FrankfurterCurrencyAdapter,
 )

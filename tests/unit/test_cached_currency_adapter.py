@@ -1,6 +1,7 @@
 from datetime import date
 
 import pytest
+
 from sharetrip.domain.interfaces.currency_port import CurrencyPort
 from sharetrip.infrastructure.cache.cached_currency_adapter import (
     CachedCurrencyAdapter,
