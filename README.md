@@ -27,6 +27,7 @@ Construit avec **FastAPI**, **PostgreSQL**, **Redis** — architecture **Clean A
 ## Table des matières
 
 - [Lancer le projet](#lancer-le-projet)
+- [Commandes disponibles](#commandes-disponibles)
 - [Architecture](#architecture)
 - [Design Patterns](#design-patterns)
 - [API](#api)
@@ -55,6 +56,54 @@ open http://localhost:8000/docs
 ```
 
 **Prérequis :** Docker + Docker Compose
+
+---
+
+## Commandes disponibles
+
+Toutes les commandes du projet passent par `make`. Exécuter `make help` pour voir la liste complète.
+
+```bash
+make help          # Afficher toutes les commandes disponibles
+```
+
+### Développement
+
+| Commande | Description |
+|----------|-------------|
+| `make run` | Démarrer l'API en mode dev (hot-reload) |
+| `make test` | Lancer la suite de tests |
+| `make cov` | Tests avec couverture (seuil 80%) |
+| `make lint` | Linter avec Ruff (auto-fix) |
+| `make format` | Formatter avec Ruff |
+
+### Base de données
+
+| Commande | Description |
+|----------|-------------|
+| `make migrate` | Appliquer toutes les migrations en attente |
+| `make migrate-down` | Rollback d'une migration |
+| `make migrate-status` | Révision courante |
+| `make migrate-history` | Historique complet |
+| `make makemigration m="description"` | Générer une nouvelle migration |
+
+### Docker
+
+| Commande | Description |
+|----------|-------------|
+| `make up` | Build et démarrer tous les services |
+| `make down` | Arrêter et supprimer les conteneurs |
+| `make logs` | Suivre les logs de l'API |
+| `make shell` | Ouvrir un shell dans le conteneur API |
+
+### Infrastructure
+
+| Commande | Description |
+|----------|-------------|
+| `make tf-plan` | Prévisualiser les changements Terraform |
+| `make tf-apply` | Appliquer les changements Terraform |
+| `make tf-destroy` | Détruire l'infrastructure provisionnée |
+| `make deploy` | Déployer via Ansible |
 
 ---
 
@@ -187,8 +236,8 @@ Le pipeline utilise une stratégie de test à double niveau (SQLite et PostgreSQ
 
 ```bash
 # Linter + formatter
-task lint          # ruff check
-task format        # ruff format
+make lint          # ruff check
+make format        # ruff format
 
 # Pre-commit (automatique avant chaque commit)
 pre-commit install
@@ -484,6 +533,7 @@ sharetrip/
 ├── docker-compose.override.yml  # Dev (hot-reload)
 ├── docker-compose.prod.yml # Production (resource limits)
 ├── sonar-project.properties
+├── Makefile                # Toutes les commandes du projet
 ├── pyproject.toml          # Deps + ruff config
 └── .env.example            # Template de configuration
 ```
