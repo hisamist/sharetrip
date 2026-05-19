@@ -57,8 +57,8 @@ resource "docker_container" "redis" {
   name  = "sharetrip_${var.environment}_redis"
   image = "redis:7-alpine"
 
-  restart  = "unless-stopped"
-  command  = ["redis-server", "--appendonly", "yes"]
+  restart = "unless-stopped"
+  command = ["redis-server", "--appendonly", "yes"]
 
   volumes {
     volume_name    = docker_volume.redis_data.name
