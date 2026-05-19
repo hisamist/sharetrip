@@ -21,3 +21,13 @@ htmlcov/
 
 sharetrip.egg-info/
 .egg-info
+
+# Downloaded provider plugins
+.terraform/
+
+# State files — contain sensitive infrastructure data
+terraform.tfstate
+terraform.tfstate.backup
+
+# Secrets — never commit real values
+terraform.tfvars
