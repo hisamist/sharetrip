@@ -26,7 +26,7 @@ jobs:
           cache: pip
       - run: pip install .[dev]
       - run: python -m ruff format --check .
-      - run: task lint
+      - run: python -m ruff check .
 
   unit-tests:
     name: Unit Tests + Coverage
