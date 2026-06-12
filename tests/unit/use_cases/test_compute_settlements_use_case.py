@@ -269,8 +269,7 @@ class TestComputeSettlementsUseCase:
         """Each person pays for everyone equally → all balances = 0."""
         expenses = [_expense(expense_id=i, paid_by=i, amount=30.0) for i in range(1, 4)]
         splits = {
-            i: [_split(i, user_id=u, amount_owed=10.0) for u in range(1, 4)]
-            for i in range(1, 4)
+            i: [_split(i, user_id=u, amount_owed=10.0) for u in range(1, 4)] for i in range(1, 4)
         }
         repo = StubTripRepository(trip=_trip(), expenses=expenses, splits=splits)
         result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))

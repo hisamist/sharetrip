@@ -174,10 +174,7 @@ class TestHybridSplitter:
             title="X",
             amount_pivot=10.0,
             split_type=SplitType.HYBRID,
-            splits=[
-                ExpenseSplit(expense_id=None, user_id=i, share_ratio=1.0)
-                for i in range(1, 4)
-            ],
+            splits=[ExpenseSplit(expense_id=None, user_id=i, share_ratio=1.0) for i in range(1, 4)],
         )
         splits = HybridSplitter().calculate(expense, three_members)
         assert sum(s.amount_owed for s in splits) == pytest.approx(10.0)

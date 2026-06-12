@@ -55,9 +55,7 @@ class PercentageSplitter(SplitStrategy):
             if i == len(members) - 1:
                 amount_owed = round(expense.amount_pivot - assigned, 2)
             else:
-                amount_owed = round(
-                    expense.amount_pivot * (m.weight_percentage / total_weight), 2
-                )
+                amount_owed = round(expense.amount_pivot * (m.weight_percentage / total_weight), 2)
                 assigned += amount_owed
             splits.append(
                 ExpenseSplit(
@@ -90,9 +88,7 @@ class HybridSplitter(SplitStrategy):
             if i == len(expense.splits) - 1:
                 amount_owed = round(expense.amount_pivot - assigned, 2)
             else:
-                amount_owed = round(
-                    expense.amount_pivot * (s.share_ratio / total_shares), 2
-                )
+                amount_owed = round(expense.amount_pivot * (s.share_ratio / total_shares), 2)
                 assigned += amount_owed
             splits.append(
                 ExpenseSplit(
