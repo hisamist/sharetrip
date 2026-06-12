@@ -158,7 +158,12 @@ class TestAuthRouter:
     def test_register_returns_422_when_email_invalid(self, client):
         resp = client.post(
             "/auth/register",
-            json={"username": "bob", "display_name": "Bob", "email": "not-an-email", "password": "s3cr3t"},
+            json={
+                "username": "bob",
+                "display_name": "Bob",
+                "email": "not-an-email",
+                "password": "s3cr3t",
+            },
         )
         assert resp.status_code == 422
 
@@ -180,11 +185,21 @@ class TestAuthRouter:
     def test_register_returns_409_on_duplicate_username(self, client):
         client.post(
             "/auth/register",
-            json={"username": "alice", "display_name": "Alice", "email": "alice@example.com", "password": "s3cr3t"},
+            json={
+                "username": "alice",
+                "display_name": "Alice",
+                "email": "alice@example.com",
+                "password": "s3cr3t",
+            },
         )
         resp = client.post(
             "/auth/register",
-            json={"username": "alice", "display_name": "Alice2", "email": "alice2@example.com", "password": "s3cr3t"},
+            json={
+                "username": "alice",
+                "display_name": "Alice2",
+                "email": "alice2@example.com",
+                "password": "s3cr3t",
+            },
         )
         assert resp.status_code == 409
 
@@ -197,7 +212,12 @@ class TestAuthRouter:
     def test_login_returns_401_on_wrong_password(self, client):
         client.post(
             "/auth/register",
-            json={"username": "bob", "display_name": "Bob", "email": "bob@example.com", "password": "s3cr3t"},
+            json={
+                "username": "bob",
+                "display_name": "Bob",
+                "email": "bob@example.com",
+                "password": "s3cr3t",
+            },
         )
         resp = client.post("/auth/login", json={"email": "bob@example.com", "password": "wrong"})
         assert resp.status_code == 401
@@ -234,7 +254,9 @@ class TestAuthRouter:
 class TestTripsRouter:
     def test_create_trip_returns_201(self, client):
         token = _register_and_login(client)
-        resp = client.post("/trips", json={"name": "Paris", "base_currency": "EUR"}, headers=_auth(token))
+        resp = client.post(
+            "/trips", json={"name": "Paris", "base_currency": "EUR"}, headers=_auth(token)
+        )
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "Paris"
@@ -270,7 +292,9 @@ class TestTripsRouter:
 
     def test_get_trip_returns_200(self, client):
         token = _register_and_login(client)
-        trip_id = client.post("/trips", json={"name": "Paris", "base_currency": "EUR"}, headers=_auth(token)).json()["id"]
+        trip_id = client.post(
+            "/trips", json={"name": "Paris", "base_currency": "EUR"}, headers=_auth(token)
+        ).json()["id"]
         resp = client.get(f"/trips/{trip_id}", headers=_auth(token))
         assert resp.status_code == 200
         assert resp.json()["name"] == "Paris"
@@ -284,14 +308,18 @@ class TestTripsRouter:
         token_alice = _register_and_login(client, "alice@example.com")
         token_bob = _register_and_login(client, "bob@example.com")
         trip_id = client.post(
-            "/trips", json={"name": "Alice Trip", "base_currency": "EUR"}, headers=_auth(token_alice)
+            "/trips",
+            json={"name": "Alice Trip", "base_currency": "EUR"},
+            headers=_auth(token_alice),
         ).json()["id"]
         resp = client.get(f"/trips/{trip_id}", headers=_auth(token_bob))
         assert resp.status_code == 403
 
     def test_list_members_returns_creator(self, client):
         token = _register_and_login(client)
-        trip_id = client.post("/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)).json()["id"]
+        trip_id = client.post(
+            "/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)
+        ).json()["id"]
         resp = client.get(f"/trips/{trip_id}/members", headers=_auth(token))
         assert resp.status_code == 200
         members = resp.json()
@@ -315,7 +343,9 @@ class TestTripsRouter:
         trip_id = client.post(
             "/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token_alice)
         ).json()["id"]
-        resp = client.post(f"/trips/{trip_id}/members", json={"user_id": bob_id}, headers=_auth(token_alice))
+        resp = client.post(
+            f"/trips/{trip_id}/members", json={"user_id": bob_id}, headers=_auth(token_alice)
+        )
         assert resp.status_code == 204
 
     def test_add_member_appears_in_member_list(self, client):
@@ -325,35 +355,53 @@ class TestTripsRouter:
         trip_id = client.post(
             "/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token_alice)
         ).json()["id"]
-        client.post(f"/trips/{trip_id}/members", json={"user_id": bob_id}, headers=_auth(token_alice))
+        client.post(
+            f"/trips/{trip_id}/members", json={"user_id": bob_id}, headers=_auth(token_alice)
+        )
         members = client.get(f"/trips/{trip_id}/members", headers=_auth(token_alice)).json()
         assert len(members) == 2
         assert any(m["user_id"] == bob_id for m in members)
 
     def test_add_member_returns_404_when_user_not_found(self, client):
         token = _register_and_login(client)
-        trip_id = client.post("/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)).json()["id"]
-        resp = client.post(f"/trips/{trip_id}/members", json={"user_id": 9999}, headers=_auth(token))
+        trip_id = client.post(
+            "/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)
+        ).json()["id"]
+        resp = client.post(
+            f"/trips/{trip_id}/members", json={"user_id": 9999}, headers=_auth(token)
+        )
         assert resp.status_code == 404
 
     def test_add_member_returns_409_when_already_member(self, client):
         token = _register_and_login(client)
         user_id = client.get("/auth/me", headers=_auth(token)).json()["id"]
-        trip_id = client.post("/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)).json()["id"]
-        resp = client.post(f"/trips/{trip_id}/members", json={"user_id": user_id}, headers=_auth(token))
+        trip_id = client.post(
+            "/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)
+        ).json()["id"]
+        resp = client.post(
+            f"/trips/{trip_id}/members", json={"user_id": user_id}, headers=_auth(token)
+        )
         assert resp.status_code == 409
 
     def test_add_member_returns_422_when_missing_user_id(self, client):
         token = _register_and_login(client)
-        trip_id = client.post("/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)).json()["id"]
+        trip_id = client.post(
+            "/trips", json={"name": "Trip", "base_currency": "EUR"}, headers=_auth(token)
+        ).json()["id"]
         resp = client.post(f"/trips/{trip_id}/members", json={}, headers=_auth(token))
         assert resp.status_code == 422
 
     def test_list_trips_shows_only_user_trips(self, client):
         token_alice = _register_and_login(client, "alice@example.com")
         token_bob = _register_and_login(client, "bob@example.com")
-        client.post("/trips", json={"name": "Alice Trip", "base_currency": "EUR"}, headers=_auth(token_alice))
-        client.post("/trips", json={"name": "Bob Trip", "base_currency": "USD"}, headers=_auth(token_bob))
+        client.post(
+            "/trips",
+            json={"name": "Alice Trip", "base_currency": "EUR"},
+            headers=_auth(token_alice),
+        )
+        client.post(
+            "/trips", json={"name": "Bob Trip", "base_currency": "USD"}, headers=_auth(token_bob)
+        )
         resp = client.get("/trips", headers=_auth(token_alice))
         names = [t["name"] for t in resp.json()]
         assert "Alice Trip" in names
@@ -372,7 +420,9 @@ class TestExpensesRouter:
             "/trips", json={"name": "Tokyo", "base_currency": "EUR"}, headers=_auth(token_alice)
         ).json()
         bob_id = client.get("/auth/me", headers=_auth(token_bob)).json()["id"]
-        client.post(f"/trips/{trip['id']}/members", json={"user_id": bob_id}, headers=_auth(token_alice))
+        client.post(
+            f"/trips/{trip['id']}/members", json={"user_id": bob_id}, headers=_auth(token_alice)
+        )
         return {"trip": trip, "token_alice": token_alice, "token_bob": token_bob, "bob_id": bob_id}
 
     def test_add_expense_returns_201(self, client, trip_ctx):
@@ -391,7 +441,13 @@ class TestExpensesRouter:
     def test_add_expense_with_category(self, client, trip_ctx):
         resp = client.post(
             f"/trips/{trip_ctx['trip']['id']}/expenses",
-            json={"title": "Hotel", "amount": 200.0, "currency": "EUR", "split_type": "equal", "category": "accommodation"},
+            json={
+                "title": "Hotel",
+                "amount": 200.0,
+                "currency": "EUR",
+                "split_type": "equal",
+                "category": "accommodation",
+            },
             headers=_auth(trip_ctx["token_alice"]),
         )
         assert resp.status_code == 201
@@ -440,7 +496,9 @@ class TestExpensesRouter:
                 json={"title": title, "amount": 30.0, "currency": "EUR", "split_type": "equal"},
                 headers=_auth(trip_ctx["token_alice"]),
             )
-        resp = client.get(f"/trips/{trip_ctx['trip']['id']}/expenses", headers=_auth(trip_ctx["token_alice"]))
+        resp = client.get(
+            f"/trips/{trip_ctx['trip']['id']}/expenses", headers=_auth(trip_ctx["token_alice"])
+        )
         assert resp.status_code == 200
         assert len(resp.json()) == 3
 
@@ -450,7 +508,9 @@ class TestExpensesRouter:
             json={"title": "Dinner", "amount": 100.0, "currency": "EUR", "split_type": "equal"},
             headers=_auth(trip_ctx["token_alice"]),
         )
-        resp = client.get(f"/trips/{trip_ctx['trip']['id']}/expenses", headers=_auth(trip_ctx["token_alice"]))
+        resp = client.get(
+            f"/trips/{trip_ctx['trip']['id']}/expenses", headers=_auth(trip_ctx["token_alice"])
+        )
         splits = resp.json()[0]["splits"]
         assert len(splits) == 2
         amounts = sorted(s["amount_owed"] for s in splits)
@@ -477,7 +537,9 @@ class TestSettlementsRouter:
         ).json()
         bob_id = client.get("/auth/me", headers=_auth(token_bob)).json()["id"]
         alice_id = client.get("/auth/me", headers=_auth(token_alice)).json()["id"]
-        client.post(f"/trips/{trip['id']}/members", json={"user_id": bob_id}, headers=_auth(token_alice))
+        client.post(
+            f"/trips/{trip['id']}/members", json={"user_id": bob_id}, headers=_auth(token_alice)
+        )
         return {
             "trip": trip,
             "token_alice": token_alice,
@@ -487,7 +549,9 @@ class TestSettlementsRouter:
         }
 
     def test_returns_empty_list_when_no_expenses(self, client, trip_ctx):
-        resp = client.get(f"/trips/{trip_ctx['trip']['id']}/settlements", headers=_auth(trip_ctx["token_alice"]))
+        resp = client.get(
+            f"/trips/{trip_ctx['trip']['id']}/settlements", headers=_auth(trip_ctx["token_alice"])
+        )
         assert resp.status_code == 200
         assert resp.json() == []
 
@@ -497,7 +561,9 @@ class TestSettlementsRouter:
             json={"title": "Dinner", "amount": 100.0, "currency": "EUR", "split_type": "equal"},
             headers=_auth(trip_ctx["token_alice"]),
         )
-        resp = client.get(f"/trips/{trip_ctx['trip']['id']}/settlements", headers=_auth(trip_ctx["token_alice"]))
+        resp = client.get(
+            f"/trips/{trip_ctx['trip']['id']}/settlements", headers=_auth(trip_ctx["token_alice"])
+        )
         assert resp.status_code == 200
         transfers = resp.json()
         assert len(transfers) == 1
@@ -512,7 +578,9 @@ class TestSettlementsRouter:
                 json={"title": "Expense", "amount": 60.0, "currency": "EUR", "split_type": "equal"},
                 headers=_auth(token),
             )
-        resp = client.get(f"/trips/{trip_ctx['trip']['id']}/settlements", headers=_auth(trip_ctx["token_alice"]))
+        resp = client.get(
+            f"/trips/{trip_ctx['trip']['id']}/settlements", headers=_auth(trip_ctx["token_alice"])
+        )
         assert resp.status_code == 200
         assert resp.json() == []
 
