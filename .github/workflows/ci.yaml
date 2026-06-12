@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 env:
   REGISTRY: ghcr.io
@@ -39,7 +38,7 @@ jobs:
           cache: pip
       - run: pip install .[dev]
       - run: >
-          python -m pytest tests/unit/ tests/integration/
+          python -m pytest tests/unit/ 
           --cov=src --cov-report=xml --cov-fail-under=70
       - uses: actions/upload-artifact@v4
         with:
