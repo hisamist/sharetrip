@@ -197,3 +197,98 @@ class TestComputeSettlementsUseCase:
 
         total_transferred = sum(t.amount for t in result.transfers)
         assert abs(total_transferred - 200.0) < 0.01
+
+    def test_should_return_no_transfers_when_single_member_paid_for_themselves(self):
+        """Alice is alone in the trip and paid for herself only."""
+        expense = _expense(expense_id=1, paid_by=1, amount=100.0)
+        splits = {1: [_split(1, user_id=1, amount_owed=100.0)]}
+        repo = StubTripRepository(trip=_trip(), expenses=[expense], splits=splits)
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
+        assert result.transfers == []
+
+    def test_should_produce_three_transfers_for_four_person_trip_with_one_payer(self):
+        """A pays 200 for all 4 (50 each) → 3 transfers: B, C, D → A."""
+        expense = _expense(expense_id=1, paid_by=1, amount=200.0)
+        splits = {
+            1: [
+                _split(1, user_id=1, amount_owed=50.0),
+                _split(1, user_id=2, amount_owed=50.0),
+                _split(1, user_id=3, amount_owed=50.0),
+                _split(1, user_id=4, amount_owed=50.0),
+            ]
+        }
+        repo = StubTripRepository(trip=_trip(), expenses=[expense], splits=splits)
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
+
+        assert len(result.transfers) == 3
+        assert all(t.to_user_id == 1 for t in result.transfers)
+        assert abs(sum(t.amount for t in result.transfers) - 150.0) < 0.01
+
+    def test_should_not_create_cross_transfers_when_debts_are_independent(self):
+        """
+        A pays 100 for A+C only: A=+50, C=-50
+        B pays 100 for B+D only: B=+50, D=-50
+        Expected: C→A and D→B — no C→B or D→A.
+        """
+        e1 = _expense(expense_id=1, paid_by=1, amount=100.0)
+        e2 = _expense(expense_id=2, paid_by=2, amount=100.0)
+        splits = {
+            1: [_split(1, user_id=1, amount_owed=50.0), _split(1, user_id=3, amount_owed=50.0)],
+            2: [_split(2, user_id=2, amount_owed=50.0), _split(2, user_id=4, amount_owed=50.0)],
+        }
+        repo = StubTripRepository(trip=_trip(), expenses=[e1, e2], splits=splits)
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
+
+        assert len(result.transfers) == 2
+        pairs = {(t.from_user_id, t.to_user_id) for t in result.transfers}
+        assert (3, 1) in pairs  # C → A
+        assert (4, 2) in pairs  # D → B
+
+    def test_should_collapse_chain_debt_into_direct_transfer(self):
+        """
+        A pays 30 only for B (B owes A 30).
+        B pays 30 only for C (C owes B 30).
+        Net: A=+30, B=0, C=-30 → single transfer C→A 30, not C→B→A.
+        """
+        e1 = _expense(expense_id=1, paid_by=1, amount=30.0)
+        e2 = _expense(expense_id=2, paid_by=2, amount=30.0)
+        splits = {
+            1: [_split(1, user_id=2, amount_owed=30.0)],  # B owes A
+            2: [_split(2, user_id=3, amount_owed=30.0)],  # C owes B
+        }
+        repo = StubTripRepository(trip=_trip(), expenses=[e1, e2], splits=splits)
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
+
+        assert len(result.transfers) == 1
+        t = result.transfers[0]
+        assert t.from_user_id == 3
+        assert t.to_user_id == 1
+        assert abs(t.amount - 30.0) < 0.01
+
+    def test_should_return_no_transfers_when_all_paid_symmetrically(self):
+        """Each person pays for everyone equally → all balances = 0."""
+        expenses = [_expense(expense_id=i, paid_by=i, amount=30.0) for i in range(1, 4)]
+        splits = {
+            i: [_split(i, user_id=u, amount_owed=10.0) for u in range(1, 4)]
+            for i in range(1, 4)
+        }
+        repo = StubTripRepository(trip=_trip(), expenses=expenses, splits=splits)
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
+        assert result.transfers == []
+
+    def test_should_conserve_total_money_in_all_transfers(self):
+        """sum(transfers) must equal the net debt of all debtors."""
+        expense = _expense(expense_id=1, paid_by=1, amount=300.0)
+        splits = {
+            1: [
+                _split(1, user_id=1, amount_owed=75.0),
+                _split(1, user_id=2, amount_owed=75.0),
+                _split(1, user_id=3, amount_owed=75.0),
+                _split(1, user_id=4, amount_owed=75.0),
+            ]
+        }
+        repo = StubTripRepository(trip=_trip(), expenses=[expense], splits=splits)
+        result = ComputeSettlementsUseCase(repo).execute(ComputeSettlementsInput(trip_id=1))
+
+        # A paid 300, owes 75 herself → is owed 225 by B, C, D
+        assert abs(sum(t.amount for t in result.transfers) - 225.0) < 0.01

@@ -185,6 +185,24 @@ class TestSplitStrategies:
             output.expense.amount_pivot
         )
 
+    def test_should_sum_splits_to_amount_pivot_for_non_divisible_amount_with_three_members(
+        self, trip
+    ):
+        """
+        10.0 EUR split equally among 3: 10.0 / 3 = 3.33 each → sum = 9.99 ≠ 10.0.
+        The last split must absorb the rounding remainder to preserve money conservation.
+        """
+        members = [Membership(trip_id=1, user_id=i) for i in range(1, 4)]
+        uc = AddExpenseUseCase(
+            trip_repository=StubTripRepository(trip=trip, members=members),
+            currency_port=StubCurrencyPort(rate=1.0),
+            split_factory=SplitFactory(),
+        )
+        output = uc.execute(_input(amount=10.0, currency="EUR", split_type=SplitType.EQUAL))
+        assert sum(s.amount_owed for s in output.splits) == pytest.approx(
+            output.expense.amount_pivot
+        )
+
 
 # ─── Cas d'erreur ─────────────────────────────────────────────────────────────
 

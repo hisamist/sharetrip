@@ -57,6 +57,23 @@ class TestEqualSplitter:
         splits = EqualSplitter().calculate(base_expense, three_members)
         assert all(s.share_ratio == 1.0 for s in splits)
 
+    def test_should_sum_to_total_when_amount_not_divisible_by_members(self, three_members):
+        """10.0 / 3 = 3.33 each → sum = 9.99 ≠ 10.0 : rounding bug."""
+        expense = Expense(
+            trip_id=1, paid_by=1, title="X", amount_pivot=10.0, split_type=SplitType.EQUAL
+        )
+        splits = EqualSplitter().calculate(expense, three_members)
+        assert sum(s.amount_owed for s in splits) == pytest.approx(10.0)
+
+    def test_should_sum_to_total_for_prime_amount_with_many_members(self):
+        """97.0 / 7 = 13.857... : each split rounds, remainder must be absorbed."""
+        expense = Expense(
+            trip_id=1, paid_by=1, title="X", amount_pivot=97.0, split_type=SplitType.EQUAL
+        )
+        members = [Membership(trip_id=1, user_id=i) for i in range(1, 8)]
+        splits = EqualSplitter().calculate(expense, members)
+        assert sum(s.amount_owed for s in splits) == pytest.approx(97.0)
+
 
 # ─── PercentageSplitter ───────────────────────────────────────────────────────
 
@@ -88,6 +105,14 @@ class TestPercentageSplitter:
     def test_should_raise_when_no_members(self, base_expense):
         with pytest.raises(ValueError, match="no members"):
             PercentageSplitter().calculate(base_expense, [])
+
+    def test_should_sum_to_total_when_weights_produce_non_divisible_amounts(self, three_members):
+        """100.0 / 3 equal weights = 33.33 each → sum = 99.99 ≠ 100.0 : rounding bug."""
+        expense = Expense(
+            trip_id=1, paid_by=1, title="X", amount_pivot=100.0, split_type=SplitType.PERCENTAGE
+        )
+        splits = PercentageSplitter().calculate(expense, three_members)
+        assert sum(s.amount_owed for s in splits) == pytest.approx(100.0)
 
 
 # ─── HybridSplitter ───────────────────────────────────────────────────────────
@@ -140,6 +165,22 @@ class TestHybridSplitter:
         )
         splits = HybridSplitter().calculate(expense, three_members)
         assert sum(s.amount_owed for s in splits) == pytest.approx(90.0)
+
+    def test_should_sum_to_total_when_ratios_produce_non_divisible_amounts(self, three_members):
+        """10.0 split with ratio 1/1/1 = 3.33 each → sum = 9.99 ≠ 10.0 : rounding bug."""
+        expense = Expense(
+            trip_id=1,
+            paid_by=1,
+            title="X",
+            amount_pivot=10.0,
+            split_type=SplitType.HYBRID,
+            splits=[
+                ExpenseSplit(expense_id=None, user_id=i, share_ratio=1.0)
+                for i in range(1, 4)
+            ],
+        )
+        splits = HybridSplitter().calculate(expense, three_members)
+        assert sum(s.amount_owed for s in splits) == pytest.approx(10.0)
 
     def test_should_raise_when_no_splits_defined(self, three_members):
         with pytest.raises(ValueError, match="share_ratio"):

@@ -19,16 +19,25 @@ class EqualSplitter(SplitStrategy):
             raise ValueError("Cannot split expense with no members")
 
         share = expense.amount_pivot / len(members)
+        splits = []
+        assigned = 0.0
 
-        return [
-            ExpenseSplit(
-                expense_id=expense.id,
-                user_id=m.user_id,
-                share_ratio=1.0,
-                amount_owed=round(share, 2),
+        for i, m in enumerate(members):
+            if i == len(members) - 1:
+                amount_owed = round(expense.amount_pivot - assigned, 2)
+            else:
+                amount_owed = round(share, 2)
+                assigned += amount_owed
+            splits.append(
+                ExpenseSplit(
+                    expense_id=expense.id,
+                    user_id=m.user_id,
+                    share_ratio=1.0,
+                    amount_owed=amount_owed,
+                )
             )
-            for m in members
-        ]
+
+        return splits
 
 
 class PercentageSplitter(SplitStrategy):
@@ -39,16 +48,27 @@ class PercentageSplitter(SplitStrategy):
             raise ValueError("Cannot split expense with no members")
 
         total_weight = sum(m.weight_percentage for m in members)
+        splits = []
+        assigned = 0.0
 
-        return [
-            ExpenseSplit(
-                expense_id=expense.id,
-                user_id=m.user_id,
-                share_ratio=m.weight_percentage,
-                amount_owed=round(expense.amount_pivot * (m.weight_percentage / total_weight), 2),
+        for i, m in enumerate(members):
+            if i == len(members) - 1:
+                amount_owed = round(expense.amount_pivot - assigned, 2)
+            else:
+                amount_owed = round(
+                    expense.amount_pivot * (m.weight_percentage / total_weight), 2
+                )
+                assigned += amount_owed
+            splits.append(
+                ExpenseSplit(
+                    expense_id=expense.id,
+                    user_id=m.user_id,
+                    share_ratio=m.weight_percentage,
+                    amount_owed=amount_owed,
+                )
             )
-            for m in members
-        ]
+
+        return splits
 
 
 class HybridSplitter(SplitStrategy):
@@ -63,13 +83,24 @@ class HybridSplitter(SplitStrategy):
             raise ValueError("Hybrid split requires ExpenseSplits with share_ratio")
 
         total_shares = sum(s.share_ratio for s in expense.splits)
+        splits = []
+        assigned = 0.0
 
-        return [
-            ExpenseSplit(
-                expense_id=expense.id,
-                user_id=s.user_id,
-                share_ratio=s.share_ratio,
-                amount_owed=round(expense.amount_pivot * (s.share_ratio / total_shares), 2),
+        for i, s in enumerate(expense.splits):
+            if i == len(expense.splits) - 1:
+                amount_owed = round(expense.amount_pivot - assigned, 2)
+            else:
+                amount_owed = round(
+                    expense.amount_pivot * (s.share_ratio / total_shares), 2
+                )
+                assigned += amount_owed
+            splits.append(
+                ExpenseSplit(
+                    expense_id=expense.id,
+                    user_id=s.user_id,
+                    share_ratio=s.share_ratio,
+                    amount_owed=amount_owed,
+                )
             )
-            for s in expense.splits
-        ]
+
+        return splits
