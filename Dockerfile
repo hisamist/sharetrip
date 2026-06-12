@@ -1,6 +1,6 @@
 # Final image size: ~190MB (target: < 200MB) — verified with `docker image ls`
-# ========== STAGE 1: Builder ==========
-# Use the official uv image which includes the uv binary for high-speed dependency management
+
+#  STAGE 1: Builder
 FROM ghcr.io/astral-sh/uv:python3.13-alpine AS builder
 
 # Install build-time system dependencies (e.g., for compiling database drivers)
@@ -35,7 +35,7 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-# SECURITY: Create a non-privileged user and group to run the application safely
+# SECURITY
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # Copy only the pre-installed virtual environment from the builder stage
